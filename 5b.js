@@ -2784,8 +2784,10 @@ function drawMenu0Button(text, x, y, grayed, action, width = menu0ButtonSize.w, 
 
 	drawRoundedRect(fill, x, y, width, height, menu0ButtonSize.cr);
 
-	// timer mod: add auto scaling
-	ctx.font = `bold ${width/menu0ButtonSize.w * 30}px Helvetica`;
+	// timer mod: add auto scaling based on width and height, clamp so text doesn't shrink too much
+	let _scale = Math.min(width / menu0ButtonSize.w, height / menu0ButtonSize.h);
+	_scale = Math.max(_scale, 0.6); // don't shrink below 80% of default
+	ctx.font = `bold ${30 * _scale}px Helvetica`;
 	ctx.fillStyle = '#666666';
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
@@ -3058,6 +3060,26 @@ function drawLevelMap() {
 	drawMenu0Button(`SHOWING: ${bfdia5b.getItem('timerMod.showPrevTime') == 'true' ? 'PREV' : 'BEST'}`, 357.20, 129.35, false,
 		() => bfdia5b.setItem('timerMod.showPrevTime', bfdia5b.getItem('timerMod.showPrevTime') != 'true'),
 		164.15, 23.20
+	);
+	drawMenu0Button('19', 100, 129.35, false, () => { levelProgress = 18; }, 
+		40, 23.20
+	);
+	drawMenu0Button('31', 150, 129.35, false, () => { levelProgress = 30; }, 
+		40, 23.20
+	);
+	drawMenu0Button('42', 200, 129.35, false, () => { levelProgress = 41; }, 
+		40, 23.20
+	);
+	drawMenu0Button('53', 250, 129.35, false, () => { levelProgress = 52; }, 
+		40, 23.20
+	);
+	// drawMenu0Button('+', 300, 129.35, false, () => { levelProgress++; }, 
+	drawMenu0Button('+', 300, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; }, 
+		25, 23.20
+	);
+	// drawMenu0Button('-', 330, 129.35, false, () => { levelProgress--; }, 
+	drawMenu0Button('-', 330, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; }, 
+		25, 23.20
 	);
 	for (let i = 0; i < (playingLevelpack?levelCount:133); i++) {
 		let j = i;
