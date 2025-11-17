@@ -63,3 +63,84 @@ p{
 	image-rendering: crisp-edges;
 	-ms-interpolation-mode: nearest-neighbor;
 }
+
+/* Livesplit stuff: */
+#livesplit-container {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			height: 75px;
+			background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+			border-bottom: 3px solid #c92b20;
+			display: flex;
+			align-items: center;
+			padding: 10px 20px;
+			box-sizing: border-box;
+			font-family: 'Courier New', monospace;
+			color: #fff;
+			z-index: 1000;
+		}
+		#livesplit-entries {
+			flex: 1;
+			overflow-x: auto;
+			overflow-y: hidden;
+			display: flex;
+			gap: 15px;
+			padding-right: 20px;
+		}
+		.livesplit-entry {
+			flex-shrink: 0;
+			min-width: 250px;
+			background: rgba(0, 0, 0, 0.3);
+			border: 1px solid #555;
+			border-radius: 4px;
+			padding: 12px;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+		}
+		.entry-name {
+			font-size: 14px;
+			font-weight: bold;
+			color: #aaa;
+			margin-bottom: 5px;
+		}
+		.entry-times-row {
+			display: flex;
+			justify-content: space-between;
+			gap: 20px;
+			align-items: center;
+		}
+		.entry-time {
+			font-size: 18px;
+			font-weight: bold;
+			color: #fff;
+			font-variant-numeric: tabular-nums;
+		}
+		.entry-cumul-time {
+			font-size: 14px;
+			color: #999;
+			font-variant-numeric: tabular-nums;
+			text-align: right;
+		}
+		#livesplit-timer {
+			display: flex;
+			flex-direction: column;
+			align-items: flex-end;
+			justify-content: center;
+			min-width: 180px;
+			padding-left: 20px;
+			border-left: 2px solid #555;
+		}
+		#timer-label {
+			font-size: 12px;
+			color: #aaa;
+			margin-bottom: 5px;
+		}
+		#timer-display {
+			font-size: 32px;
+			font-weight: bold;
+			color: #fff;
+			font-variant-numeric: tabular-nums;
+		}

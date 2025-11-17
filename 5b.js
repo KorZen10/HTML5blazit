@@ -95,6 +95,22 @@ let levelpackProgress = {};
 const bfdia5b = window.localStorage;
 let deathCount;
 let timer;
+let sessionTimerAccum = 0; // milliseconds accumulated while session has been running
+let sessionTimerStartWallTime = null; // performance.now() when running, null when stopped
+let sessionTimerLastEntry = null; // performance.now() when entering the last level, null if not in a level
+let sessionTimerRunning = false; // Whether session timer is currently counting
+
+// Per-run split state: these are reset by `beginNewGame()`.	
+// `sessionSplitTimes[level]` === null means no split recorded yet for this run.
+let sessionSplitTimes = new Array(levelCount).fill(null);
+// Track cumulative times (sessionTimerAccum at each level completion) for current run
+let sessionCumulTimes = new Array(levelCount).fill(null);
+// Track entry times (wallclock performance.now() when level was completed) for current run
+let sessionEntryTimes = new Array(levelCount).fill(null);
+// Best run tracking: stores the fastest total time and its cumulative times per level
+let fastestRunTime = null; // fastest total sessionTimerAccum when run completed
+let fastestRunCumulTimes = new Array(levelCount).fill(null); // cumulative times from fastest run
+let fastestRunEntryTimes = new Array(levelCount).fill(null); // entry times (wallclock) from fastest run
 let coins;
 let longMode = false;
 let quirksMode = false;
@@ -150,6 +166,8 @@ function saveGame() {
 	bfdia5b.setItem('bonusesCleared', bonusesCleared);
 	bfdia5b.setItem('deathCount', deathCount);
 	bfdia5b.setItem('timer', timer);
+	// Save fastest run data
+	saveFastestRun();
 }
 
 function getSavedGame() {
@@ -177,9 +195,37 @@ function getSavedGame() {
 		// }
 		bonusesCleared = new Array(33).fill(false);
 	}
+	// Load fastest run data
+	loadFastestRun();
 }
 getSavedGame();
 getSavedSettings();
+
+function saveFastestRun() {
+	if (fastestRunTime !== null) {
+		bfdia5b.setItem('fastestRunTime', fastestRunTime.toString());
+		bfdia5b.setItem('fastestRunCumulTimes', fastestRunCumulTimes.map(t => t === null ? 'null' : t.toString()).join(','));
+		bfdia5b.setItem('fastestRunEntryTimes', fastestRunEntryTimes.map(t => t === null ? 'null' : t.toString()).join(','));
+	}
+}
+
+function loadFastestRun() {
+	const savedTime = bfdia5b.getItem('fastestRunTime');
+	if (savedTime !== null) {
+		fastestRunTime = parseInt(savedTime, 10);
+		const savedCumuls = bfdia5b.getItem('fastestRunCumulTimes');
+		if (savedCumuls) {
+			fastestRunCumulTimes = savedCumuls.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
+			if (document.getElementById('TEMP') !== null) {
+				document.getElementById('TEMP').textContent = fastestRunCumulTimes[0];
+			}
+		}
+		const savedEntryTimes = bfdia5b.getItem('fastestRunEntryTimes');
+		if (savedEntryTimes) {
+			fastestRunEntryTimes = savedEntryTimes.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
+		}
+	}
+}
 
 function saveSettings() {
 	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled]));
@@ -2126,6 +2172,202 @@ function toHMS(i) {
 	);
 }
 
+// Format milliseconds as MM:SS.mmm (minutes total, no hours)
+function toMMSSms(ms) {
+	const totalMs = Number(ms) || 0;
+	const minutes = Math.floor(totalMs / 60000);
+	const seconds = Math.floor((totalMs % 60000) / 1000);
+	const msecs = totalMs % 1000;
+	return (
+		minutes.toString().padStart(2, '0') + ':' +
+		seconds.toString().padStart(2, '0') + '.' +
+		msecs.toString().padStart(3, '0')
+	);
+}
+
+function updateSessionTimerDisplay() {
+	const timerDisplay = document.getElementById('timer-display');
+	if (timerDisplay) {
+		const ms = getSessionTimerMs();
+		if (timerDisplay) timerDisplay.textContent = toMMSSms(ms);
+	}
+}
+
+// Return current session timer in milliseconds (uses wall-clock so hidden tabs are accounted for)
+function getSessionTimerMs() {
+	if (sessionTimerRunning && sessionTimerStartWallTime != null) {
+		return Math.round(sessionTimerAccum + (performance.now() - sessionTimerStartWallTime));
+	}
+	return Math.round(sessionTimerAccum);
+}
+
+function startSessionTimer() {
+	if (!sessionTimerRunning) {
+		sessionTimerStartWallTime = performance.now();
+		sessionTimerRunning = true;
+	}
+}
+
+function stopSessionTimer() {
+	if (sessionTimerRunning) {
+		sessionTimerAccum += performance.now() - sessionTimerStartWallTime;
+		sessionTimerStartWallTime = null;
+		sessionTimerRunning = false;
+	}
+	// Compare current run time to fastest run and update if faster
+	compareFastestRun();
+}
+
+function compareFastestRun() {
+	// Only compare if we have a valid sessionTimerAccum (the run actually completed)
+	if (sessionTimerAccum <= 0) return;
+	
+	if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
+		// New fastest run!
+		fastestRunTime = sessionTimerAccum;
+		fastestRunCumulTimes = [...sessionCumulTimes]; // Copy current session cumulative times
+		fastestRunEntryTimes = [...sessionEntryTimes]; // Copy current session entry times
+		saveFastestRun();
+		console.log(`New fastest run! Time: ${toMMSSms(fastestRunTime)}`);
+	}
+}
+
+function resetSessionTimer() {
+	sessionTimerAccum = 0;
+	sessionTimerStartWallTime = null;
+	sessionTimerRunning = false;
+	try { updateSessionTimerDisplay(); } catch (e) {}
+	// Update all livesplit entries to show fastest run times when a new run starts
+	updateAllLivesplitEntries();
+}
+
+function updateSplitTime(levelId) {
+	// Update the corresponding split entry in the DOM using stored `prev`/`best` values.
+	try {
+		const el = document.getElementById('split-time-' + levelId);
+		if (!el) return;
+		// Prefer the session-run split (the duration between entering and exiting the level)
+		let value = null;
+		if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
+			value = sessionSplitTimes[levelId];
+		} else {
+			// Prefer explicit split (entry) times from the fastest run saved in storage.
+			// If not loaded into memory yet, try loading it.
+			if (typeof fastestRunEntryTimes === 'undefined' || (Array.isArray(fastestRunEntryTimes) && fastestRunEntryTimes.every(v => v == null))) {
+				try { loadFastestRun(); } catch (e) {}
+			}
+			if (typeof fastestRunEntryTimes !== 'undefined' && fastestRunEntryTimes[levelId] != null) {
+				value = fastestRunEntryTimes[levelId];
+			} else if (typeof prev !== 'undefined' && prev[levelId] != undefined && prev[levelId] !== 'NaN') {
+				value = parseInt(prev[levelId], 10);
+			} else if (typeof best !== 'undefined' && best[levelId] != undefined && best[levelId] !== 'NaN') {
+				value = parseInt(best[levelId], 10);
+			}
+		}
+		if (value != null && !isNaN(value)) {
+			el.textContent = toMMSSms(value);
+		} else {
+			el.textContent = '\u2014'; // em dash for no time
+		}
+		
+		// Update cumulative time on the right side
+		const cumulEl = document.getElementById('split-cumul-time-' + levelId);
+		if (cumulEl) {
+			// Prefer current session cumulative time if we have an active split
+			if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
+				const sessionNow = getSessionTimerMs();
+				cumulEl.textContent = sessionNow > 0 ? toMMSSms(sessionNow) : '\u2014';
+			} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[levelId] != null && fastestRunCumulTimes[levelId] > 0) {
+				// Otherwise show fastest run cumulative time (only if it's valid)
+				cumulEl.textContent = toMMSSms(fastestRunCumulTimes[levelId]);
+			} else {
+				cumulEl.textContent = '\u2014';
+			}
+		}
+	} catch (e) {
+		// DOM might not be ready; ignore silently
+	}
+}
+
+function updateAllLivesplitEntries() {
+	// Update all livesplit entries to display the fastest run times
+	// Called when a new run starts or after loading
+	try {
+		for (let i = 0; i < levelCount; i++) {
+			updateSplitTime(i);
+		}
+	} catch (e) {
+		// ignore if DOM not ready
+	}
+}
+
+function applyFastestRunToSession() {
+	// Copy fastest-run data into current session arrays so the UI shows them
+	// Ensure fastest-run arrays are loaded
+	if (!Array.isArray(fastestRunCumulTimes) || fastestRunCumulTimes.every(v => v == null)) {
+		loadFastestRun();
+	}
+	updateAllLivesplitEntries();
+	console.log('Applied fastest run to session splits');
+}
+
+function createResetSplitsButton() {
+	try {
+		const container = document.getElementById('resetSplitsButton');
+		if (!container) return;
+		container.innerHTML = '';
+		const btn = document.createElement('button');
+		btn.type = 'button';
+		btn.id = 'loadSplitsFromStorage';
+		btn.textContent = 'Load Splits from Storage';
+		btn.addEventListener('click', () => {
+			applyFastestRunToSession();
+		});
+		container.appendChild(btn);
+	} catch (e) {
+		// ignore
+	}
+}
+
+function clearFastestRun() {
+	try {
+		// Clear in-memory values
+		fastestRunTime = null;
+		fastestRunCumulTimes = new Array(levelCount).fill(null);
+		fastestRunEntryTimes = new Array(levelCount).fill(null);
+		// Remove from localStorage
+		try { bfdia5b.removeItem('fastestRunTime'); } catch (e) {}
+		try { bfdia5b.removeItem('fastestRunCumulTimes'); } catch (e) {}
+		try { bfdia5b.removeItem('fastestRunEntryTimes'); } catch (e) {}
+		// Update UI
+		updateAllLivesplitEntries();
+		console.log('Cleared fastest run data');
+	} catch (e) {
+		console.error('Failed to clear fastest run data', e);
+	}
+}
+
+function createClearSplitsButton() {
+	try {
+		const container = document.getElementById('clearSplitsButton');
+		if (!container) return;
+		container.innerHTML = '';
+		const btn = document.createElement('button');
+		btn.type = 'button';
+		btn.id = 'clearSplitsFromStorage';
+		btn.textContent = 'Clear Fastest Run Data';
+		btn.addEventListener('click', () => {
+			// Confirm the user action
+			if (confirm('Clear fastest run data from storage? This cannot be undone.')) {
+				clearFastestRun();
+			}
+		});
+		container.appendChild(btn);
+	} catch (e) {
+		// ignore
+	}
+}
+
 // I missed processing's map() function so much I wrote my own that I think I stole parts of from stackoverflow, but didn't link to.
 function mapRange(value, min1, max1, min2, max2) {
 	return min2 + ((value - min1) / (max1 - min1)) * (max2 - min2);
@@ -2681,6 +2923,14 @@ function menu8Menu() {
 }
 
 function beginNewGame() {
+	// Reset session timer and per-run split state
+	resetSessionTimer();
+	sessionSplitTimes = new Array(levelCount).fill(null);
+	sessionCumulTimes = new Array(levelCount).fill(null);
+	sessionEntryTimes = new Array(levelCount).fill(null);
+	levelEntryTimestamps = new Array(levelCount).fill(null);
+	// Reset livesplit scroll position to the left for a new run
+	if (document.getElementById('livesplit-entries')) document.getElementById('livesplit-entries').scrollLeft = 0;
 	clearVars();
 	saveGame();
 	enterBaseLevelpackLevelSelect();
@@ -3074,11 +3324,11 @@ function drawLevelMap() {
 		40, 23.20
 	);
 	// drawMenu0Button('+', 300, 129.35, false, () => { levelProgress++; }, 
-	drawMenu0Button('+', 300, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; }, 
+	drawMenu0Button('+', 295, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; }, 
 		25, 23.20
 	);
 	// drawMenu0Button('-', 330, 129.35, false, () => { levelProgress--; }, 
-	drawMenu0Button('-', 330, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; }, 
+	drawMenu0Button('-', 325, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; }, 
 		25, 23.20
 	);
 	for (let i = 0; i < (playingLevelpack?levelCount:133); i++) {
@@ -3323,6 +3573,17 @@ function fitString(context, str, maxWidth) {
 function playLevel(i) {
 	if (i == levelProgress) playMode = 0;
 	else if (i < levelProgress) playMode = 1;
+	// Start session timer if playing level 1 and timer hasn't started yet
+	if (i === 0) {
+		startSessionTimer();
+	}
+
+	// Record entry timestamp for this attempt if the split hasn't been recorded yet this run
+	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] == null) {
+		// store session-based timestamp (milliseconds) so splits are based on session timer
+		sessionTimerLastEntry = getSessionTimerMs();
+		// try { document.getElementById('TEMP').textContent = sessionTimerLastEntry; } catch (e) {}
+	}
 	currentLevel = i;
 	wipeTimer = 30;
 	menuScreen = 3;
@@ -7806,6 +8067,91 @@ function setup() {
 	} else {
 		rAF60fps();
 	}
+
+	// Generate Livesplit entries (52) in the UI.
+	// The game script can run before the DOM body is parsed (script is in <head>),
+	// so defer creation until the document is ready. This avoids silently failing
+	// when `#livesplit-entries` doesn't yet exist.
+	function createLivesplitEntries() {
+		try {
+			const splitsContainer = document.getElementById('livesplit-entries');
+			if (!splitsContainer) return;
+			// clear any existing content
+			splitsContainer.innerHTML = '';
+			for (let i = 0; i < 52; i++) {
+				const entry = document.createElement('div');
+				entry.className = 'livesplit-entry';
+				entry.id = 'split-entry-' + i;
+				const name = document.createElement('div');
+				name.className = 'entry-name';
+				name.id = 'split-name-' + i;
+				// If levelName is available use it, otherwise fall back to a generic label.
+				name.textContent = 'Level ' + (i + 1) + (levelName && levelName[i] ? ': ' + levelName[i] : '');
+
+				// Container for both times on the same line
+				const timesRow = document.createElement('div');
+				timesRow.className = 'entry-times-row';
+
+				// Left side: individual split time (time for this level only)
+				const time = document.createElement('div');
+				time.className = 'entry-time';
+				time.id = 'split-time-' + i;
+				// Prefer session split (this run) if present, otherwise show fastest run, then prev/best or em dash
+				if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
+					time.textContent = toMMSSms(sessionSplitTimes[i]);
+				} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[i] != null) {
+					// Calculate split from fastest run: cumul[i] - cumul[i-1]
+					const prevCumul = i > 0 && fastestRunCumulTimes[i - 1] != null ? fastestRunCumulTimes[i - 1] : 0;
+					const split = fastestRunCumulTimes[i] - prevCumul;
+					time.textContent = toMMSSms(split);
+				} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
+					time.textContent = toMMSSms(parseInt(prev[i], 10));
+				} else {
+					time.textContent = '\u2014';
+				}
+
+				// Right side: cumulative time (session timer accumulation at this point)
+				const cumulTime = document.createElement('div');
+				cumulTime.className = 'entry-cumul-time';
+				cumulTime.id = 'split-cumul-time-' + i;
+				// Show current session timer if available, otherwise show fastest run cumulative time or em dash
+				const sessionNow = typeof getSessionTimerMs === 'function' ? getSessionTimerMs() : sessionTimerAccum;
+				if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
+					cumulTime.textContent = toMMSSms(sessionNow);
+				} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[i] != null && fastestRunCumulTimes[i] > 0) {
+					cumulTime.textContent = toMMSSms(fastestRunCumulTimes[i]);
+				} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
+					cumulTime.textContent = toMMSSms(parseInt(prev[i], 10));
+				} else {
+					cumulTime.textContent = '\u2014';
+				}
+
+				timesRow.appendChild(time);
+				timesRow.appendChild(cumulTime);
+
+				entry.appendChild(name);
+				entry.appendChild(timesRow);
+				splitsContainer.appendChild(entry);
+			}
+		} catch (e) {
+			// ignore DOM errors during setup
+		}
+	}
+
+	if (document.readyState === 'loading') {
+		window.addEventListener('DOMContentLoaded', () => {
+			createLivesplitEntries();
+			updateAllLivesplitEntries();
+			createResetSplitsButton();
+			createClearSplitsButton();
+		});
+	} else {
+		// Document already ready
+		createLivesplitEntries();
+		updateAllLivesplitEntries();
+		createResetSplitsButton();
+		createClearSplitsButton();
+	}
 }
 
 function draw() {
@@ -7865,6 +8211,59 @@ function draw() {
 					timer += getTimer() - levelTimer2;
 					best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimer() - levelTimer2).toFixed(0));
 					prev[currentLevel] = (getTimer() - levelTimer2).toFixed(0);
+					// Compute split based on session timer: sessionNow - sessionTimerLastEntry
+					try {
+						const sessionNow = getSessionTimerMs();
+						let elapsedMs = null;
+						if (sessionTimerLastEntry != null) {
+							elapsedMs = Math.round(sessionNow - sessionTimerLastEntry);
+						} else {
+							// fallback to previous timing if sessionTimerLastEntry wasn't set
+							elapsedMs = parseInt((getTimer() - levelTimer2).toFixed(0), 10);
+						}
+						if (sessionSplitTimes[currentLevel] == null) {
+							sessionSplitTimes[currentLevel] = elapsedMs;
+						}
+						// Track cumulative time at this level completion
+						if (sessionCumulTimes[currentLevel] == null) {
+							sessionCumulTimes[currentLevel] = sessionNow;
+						}
+						// Track entry time (wallclock when this level was completed) at this level
+						if (sessionEntryTimes[currentLevel] == null) {
+							sessionEntryTimes[currentLevel] = performance.now();
+						}
+						updateSplitTime(currentLevel);
+						// update sessionTimerLastEntry so the next split measures from this point
+						sessionTimerLastEntry = sessionNow;
+						try { document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry; } catch (e) {}
+						
+						// Stop session timer when level 52 is completed
+						if (currentLevel === 2) {
+							stopSessionTimer();
+						}
+						
+						// Auto-scroll livesplit entries one entry to the right so the newly-completed
+						// split becomes visible. This is guarded so it won't throw if the DOM
+						// element doesn't exist (e.g., running without the UI present).
+						try {
+							const container = document.getElementById('livesplit-entries');
+							if (container) {
+								const firstEntry = container.querySelector('.livesplit-entry');
+								if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
+									const style = window.getComputedStyle(firstEntry);
+									const marginRight = parseFloat(style.marginRight) || 0;
+									
+									// const amount = Math.round(firstEntry.getBoundingClientRect().width + marginRight);
+									const amount = Math.round(firstEntry.getBoundingClientRect().width + 15);
+									if (typeof container.scrollBy === 'function') {
+										container.scrollBy({ left: amount, behavior: 'smooth' });
+									} else {
+										container.scrollLeft += amount;
+									}
+								}
+							}
+						} catch (e) {}
+					} catch (e) {}
 					if (playMode == 0) {
 						currentLevel++;
 						if (!quirksMode) toSeeCS = true; // This line was absent in the original source, but without it dialogue doesn't play after level 1 when on a normal playthrough.
@@ -10370,6 +10769,8 @@ function draw() {
 	ctxReal.drawImage(canvas, 0, 0, cwidth, cheight);
 
 	_frameCount++;
+	// Update session timer display (wall-clock based); value is computed from start + accumulated time
+	try { updateSessionTimerDisplay(); } catch (e) {}
 	pmouseIsDown = mouseIsDown;
 	_pxmouse = _xmouse;
 	_pymouse = _ymouse;
@@ -10540,7 +10941,7 @@ function logInExplore() {
 			clearInterval(closedPoller);
 			getCurrentExploreUserID();
 		}
-	  }, 500);
+	}, 500);
 }
 
 function logOutExplore() {
