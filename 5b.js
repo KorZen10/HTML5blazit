@@ -8237,8 +8237,8 @@ function draw() {
 						sessionTimerLastEntry = sessionNow;
 						try { document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry; } catch (e) {}
 						
-						// Stop session timer when level 52 is completed
-						if (currentLevel === 2) {
+						// Stop session timer when level 52 is completed (last level in run - 1)
+						if (currentLevel === 51) {
 							stopSessionTimer();
 						}
 						
