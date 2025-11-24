@@ -55,6 +55,7 @@ let qTimer = 0;
 let inputText = '';
 let textAfterCursorAtClick = '';
 // let controlOrCommandPress = false;
+let noLag = false;
 
 let levelsString = '';
 let levelCount = 53;
@@ -2925,6 +2926,9 @@ function menu8Menu() {
 function beginNewGame() {
 	// Reset session timer and per-run split state
 	resetSessionTimer();
+	setFps(60);
+	document.getElementById("fpsSlider").value = 10;
+	if (paused) togglePause(); // if game is paused somehow, unpause it
 	sessionSplitTimes = new Array(levelCount).fill(null);
 	sessionCumulTimes = new Array(levelCount).fill(null);
 	sessionEntryTimes = new Array(levelCount).fill(null);
@@ -7953,6 +7957,8 @@ function keydown(event) {
 			updateLCtiles();
 		}
 	}
+
+	if (event.key ===  'g') togglePausePlay();
 }
 
 function keyup(event) {
@@ -10787,20 +10793,50 @@ let lastFrameReq = then;
 let interval = 1000 / fps;
 let delta;
 
+
 function rAF60fps() {
 	requestAnimationFrame(rAF60fps);
-	if (frameRateThrottling) {
+	if (noLag) {
+		draw();
+	} else {
 		now = window.performance.now();
 		delta = now - then;
 		if (delta > interval) {
 			then = now - (delta % interval);
-			draw();
+			for (let i = 0; i < fps/60; i++) draw();
 		}
 
 		// Added this line to fix unnecessary lag sometimes caused by the framerate limiter.
 		if (lastFrameReq - then > interval) then = now;
 		lastFrameReq = now;
-	} else draw();
+	}
+}
+
+function setFps(newFps) {
+	if (paused) return;
+	resetSessionTimer(); // nice try
+	noLag = false;
+	fps = newFps;
+	lastFrameReq = then;
+	interval = 1000 / fps;
+	document.getElementById("TEMP").textContent = fps + " FPS";
+}
+
+function toggleNoLag() {
+	noLag = !noLag;
+}
+
+let paused = false;
+function togglePausePlay() {
+	resetSessionTimer(); // nice try
+	if (paused === false) {
+		setFps(0);
+		paused = true;
+	}
+	else { // paused  === true
+		paused = false;
+		setFps(document.getElementById('fpsSlider').value * 6);
+	}
 }
 
 // Explore API Stuff
