@@ -8141,6 +8141,7 @@ function setup() {
 				entry.appendChild(name);
 				entry.appendChild(timesRow);
 				splitsContainer.appendChild(entry);
+				splitsContainer.onfocus="this.blur()"
 			}
 		} catch (e) {
 			// ignore DOM errors during setup
@@ -8258,18 +8259,18 @@ function draw() {
 							const container = document.getElementById('livesplit-entries');
 							if (container) {
 								const firstEntry = container.querySelector('.livesplit-entry');
-								if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
+								// if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
 									const style = window.getComputedStyle(firstEntry);
 									const marginRight = parseFloat(style.marginRight) || 0;
 									
 									// const amount = Math.round(firstEntry.getBoundingClientRect().width + marginRight);
-									const amount = Math.round(firstEntry.getBoundingClientRect().width + 15);
+									const amount = Math.round(firstEntry.getBoundingClientRect().width + 4.1);
 									if (typeof container.scrollBy === 'function') {
 										container.scrollBy({ left: amount, behavior: 'smooth' });
 									} else {
 										container.scrollLeft += amount;
 									}
-								}
+								// }
 							}
 						} catch (e) {}
 					} catch (e) {}
