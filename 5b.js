@@ -2421,7 +2421,9 @@ let levelButtonClicked = -1;
 let showingNewGame2 = false;
 let showingExploreNewGame2 = false;
 
-let musicSound = new Audio('data/the fiber 16x loop.wav');
+let musicSound = new Audio('data/the fiber 16x loop.wav'); 
+// let jumpSound = new Audio('data/mario_jump.wav'); 
+// let deathSound = new Audio('data/lego_yoda.wav'); 
 // musicSound.addEventListener('canplaythrough', event => {incrementCounter();});
 
 const scaleFactor = 3;
@@ -3315,24 +3317,24 @@ function drawLevelMap() {
 		() => bfdia5b.setItem('timerMod.showPrevTime', bfdia5b.getItem('timerMod.showPrevTime') != 'true'),
 		164.15, 23.20
 	);
-	drawMenu0Button('19', 100, 129.35, false, () => { levelProgress = 18; }, 
+	drawMenu0Button('19', 100, 129.35, false, () => { levelProgress = 18; stopSessionTimer(); }, 
 		40, 23.20
 	);
-	drawMenu0Button('31', 150, 129.35, false, () => { levelProgress = 30; }, 
+	drawMenu0Button('31', 150, 129.35, false, () => { levelProgress = 30; stopSessionTimer(); }, 
 		40, 23.20
 	);
-	drawMenu0Button('42', 200, 129.35, false, () => { levelProgress = 41; }, 
+	drawMenu0Button('42', 200, 129.35, false, () => { levelProgress = 41; stopSessionTimer(); }, 
 		40, 23.20
 	);
-	drawMenu0Button('53', 250, 129.35, false, () => { levelProgress = 52; }, 
+	drawMenu0Button('53', 250, 129.35, false, () => { levelProgress = 52; stopSessionTimer(); }, 
 		40, 23.20
 	);
 	// drawMenu0Button('+', 300, 129.35, false, () => { levelProgress++; }, 
-	drawMenu0Button('+', 295, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; }, 
+	drawMenu0Button('+', 295, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; stopSessionTimer(); }, 
 		25, 23.20
 	);
 	// drawMenu0Button('-', 330, 129.35, false, () => { levelProgress--; }, 
-	drawMenu0Button('-', 325, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; }, 
+	drawMenu0Button('-', 325, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; stopSessionTimer(); }, 
 		25, 23.20
 	);
 	for (let i = 0; i < (playingLevelpack?levelCount:133); i++) {
@@ -5134,6 +5136,7 @@ function displayLine(level, line) {
 
 function startDeath(i) {
 	if (char[i].deathTimer >= 30 && (char[i].charState >= 7 || char[i].temp >= 50)) {
+		// deathSound.play();
 		if (ifCarried(i)) {
 			char[char[i].carriedBy].vy = 0;
 			char[char[i].carriedBy].vx = 0;
@@ -11147,6 +11150,20 @@ class Character {
 
 	jump(jumpPower) {
 		this.vy = jumpPower;
+		// Play jump sound as a cloned node so multiple jumps can overlap.
+		try {
+			if (jumpSound) {
+				const s = jumpSound.cloneNode(true);
+				// ensure start at beginning
+				try { s.currentTime = 0; } catch (e) {}
+				// play and ignore promise rejection (autoplay policy may block)
+				s.play().catch(() => {});
+				// remove reference when finished to allow GC
+				s.addEventListener('ended', () => { try { if (s.parentNode) s.parentNode.removeChild(s); } catch (e) {} });
+			}
+		} catch (e) {
+			// ignore audio errors
+		}
 	}
 
 	swimUp(jumpPower) {

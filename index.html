@@ -18,56 +18,60 @@
 	<script type="text/javascript" src="5b.js"></script>
 </head>
 <body style="overflow:hidden;">
-<div id="livesplit-container">
-	<div id="livesplit-entries">
-		<!-- <div class="livesplit-entry">
-			<div class="entry-name">Level 1</div>
-			<div class="entry-time">0:00.00</div>
-		</div>
-		<div class="livesplit-entry">
-			<div class="entry-name">Level 2</div>
-			<div class="entry-time">0:00.00</div>
-		</div>
-		<div class="livesplit-entry">
-			<div class="entry-name">Level 3</div>
-			<div class="entry-time">0:00.00</div>
-		</div> -->
-	</div>
-	<div id="livesplit-timer">
-		<div id="timer-label">Time</div>
-		<div id="timer-display">0:00.00</div>
-	</div>
-</div>
-<div id="center">
-	<div id="hide-contenteditable"><canvas width="960" height="540" id="cnv" contenteditable="false"></canvas></div>
-	<p class="bottomtext">An HTML5 port of Cary Huang's <a href="https://bfdi.tv/5b/">BFDIA 5b</a>. Explore is powered by <a href="https://5beam.zelo.dev/">Zelo101's 5beam</a>.</p>
-	<p class="bottomtext">Forked from <a href="https://github.com/imaperson1060/HTML5b/tree/timermod">imaperson</a>, which was forked from the <a href="https://github.com/coppersalts">coppersalts</a> port of the game: <a href="https://coppersalts.github.io/HTML5b">HTML5b</a></p>
-
-	<div style="justify-content: center; display: flex">
-		<div>
-			<input id="fpsSlider" tabindex="-1" type="range" min="1" max="10" value="10" class="snap-range-input" style="width: 490px;" 
-				onchange="setFps(document.getElementById('fpsSlider').value*6)" onfocus="this.blur()">
-			<div class="range-tick-labels" style="display: flex; justify-content: center">
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 0%;">|<br>10%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 11.11%;">|<br>20%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 22.22%;">|<br>30%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 33.33%;">|<br>40%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 44.44%;">|<br>50%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 55.56%;">|<br>60%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 66.67%;">|<br>70%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 77.78%;">|<br>80%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 88.89%;">|<br>90%</span>
-				<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 100%;">|<br>100%</span>
+	<div id="livesplit-container">
+		<div id="livesplit-entries">
+			<!-- <div class="livesplit-entry">
+				<div class="entry-name">Level 1</div>
+				<div class="entry-time">0:00.00</div>
 			</div>
+			<div class="livesplit-entry">
+				<div class="entry-name">Level 2</div>
+				<div class="entry-time">0:00.00</div>
+			</div>
+			<div class="livesplit-entry">
+				<div class="entry-name">Level 3</div>
+				<div class="entry-time">0:00.00</div>
+			</div> -->
 		</div>
-		<!-- <button id="adjust-fps-button" tabindex="-1" onclick="setFps(document.getElementById('fpsSlider').value*6)">Set FPS!</button> -->
-		<button id="adjust-fps-button" tabindex="-1" onfocus="this.blur()" onclick="togglePausePlay()">Play/Pause (G)</button>
+		<div id="livesplit-timer">
+			<div id="timer-label">Time</div>
+			<div id="timer-display">0:00.00</div>
+		</div>
 	</div>
-</div>
+	<div id="center">
+		<div id="hide-contenteditable">
+			<label>hello</label>
+			<canvas width="960" height="540" id="cnv" contenteditable="false"></canvas>
+		</div>
+		<p class="bottomtext">An HTML5 port of Cary Huang's <a href="https://bfdi.tv/5b/">BFDIA 5b</a>. Explore is powered by <a href="https://5beam.zelo.dev/">Zelo101's 5beam</a>.</p>
+		<p class="bottomtext">Forked from <a href="https://github.com/imaperson1060/HTML5b/tree/timermod">imaperson</a>, which was forked from the <a href="https://github.com/coppersalts">coppersalts</a> port of the game: <a href="https://coppersalts.github.io/HTML5b">HTML5b</a></p>
 
-	<div id="TEMP">hi</h1>
-</div>
-<div id="resetSplitsButton"></div>
-<div id="clearSplitsButton"></div>
+		<div style="justify-content: center; display: flex">
+			<div>
+				<input id="fpsSlider" tabindex="-1" type="range" min="1" max="10" value="10" class="snap-range-input" style="width: 490px;" 
+					onchange="setFps(document.getElementById('fpsSlider').value*6)" onfocus="this.blur()">
+				<div class="range-tick-labels" style="display: flex; justify-content: center">
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 0%;">|<br>10%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 11.11%;">|<br>20%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 22.22%;">|<br>30%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 33.33%;">|<br>40%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 44.44%;">|<br>50%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 55.56%;">|<br>60%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 66.67%;">|<br>70%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 77.78%;">|<br>80%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 88.89%;">|<br>90%</span>
+					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 100%;">|<br>100%</span>
+				</div>
+			</div>
+			<!-- <button id="adjust-fps-button" tabindex="-1" onclick="setFps(document.getElementById('fpsSlider').value*6)">Set FPS!</button> -->
+			<button id="adjust-fps-button" tabindex="-1" onfocus="this.blur()" onclick="togglePausePlay()">Play/Pause (G)</button>
+		</div>
+		
+		<div id="TEMP">hi</h1>
+		<div style="display: flex; justify-content: center;">
+			<div id="resetSplitsButton"></div>&nbsp;
+			<div id="clearSplitsButton"></div>
+		</div>
+	</div>
 </body>
 </html>

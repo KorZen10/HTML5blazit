@@ -36,7 +36,7 @@ p{
 }
 #center{
 	position:absolute;
-	top:40%;
+	top:47%;
 	margin-top:-255px;
 }
 /* https://stackoverflow.com/questions/2310734/how-to-make-html-text-unselectable */
@@ -63,63 +63,69 @@ p{
 	image-rendering: crisp-edges;
 	-ms-interpolation-mode: nearest-neighbor;
 }
-
+/* usdifod */
 /* Livesplit stuff: */
 #livesplit-container {
 	position: fixed;
-	top: 0;
-	left: 0;
-	right: 0;
-	height: 75px;
+	bottom: 0;
+	left: 50%;
+	/* top: 50px; */
+	top: 0px;
+	transform: translateX(-50%);
+	height: 40px; /* reduced height */
+	width: 960px;
+	/* width: 100%; */
 	background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
 	border-bottom: 3px solid #c92b20;
 	display: flex;
+	justify-content: center;
 	align-items: center;
-	padding: 10px 20px;
+	padding: 6px 12px; /* reduced padding */
 	box-sizing: border-box;
 	font-family: 'Courier New', monospace;
 	color: #fff;
 	z-index: 1000;
 }
-#livesplit-entries {
+#livesplit-entries, .livesplit-entries {
 	flex: 1;
 	overflow-x: auto;
 	overflow-y: hidden;
+	height: 37px;
 	display: flex;
-	gap: 15px;
-	padding-right: 20px;
+	gap: 5px; /* smaller gap */
+	padding-right: 12px;
 }
 .livesplit-entry {
 	flex-shrink: 0;
-	min-width: 250px;
+	min-width: 140px; /* smaller entry width */
 	background: rgba(0, 0, 0, 0.3);
 	border: 1px solid #555;
-	border-radius: 4px;
-	padding: 12px;
+	border-radius: 3px;
+	padding: 6px; /* reduced padding */
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
 }
 .entry-name {
-	font-size: 14px;
+	font-size: 10px; /* scaled down */
 	font-weight: bold;
 	color: #aaa;
-	margin-bottom: 5px;
+	margin-bottom: 2px;
 }
 .entry-times-row {
 	display: flex;
 	justify-content: space-between;
-	gap: 20px;
+	gap: 12px;
 	align-items: center;
 }
 .entry-time {
-	font-size: 18px;
+	font-size: 12px; /* scaled down */
 	font-weight: bold;
 	color: #fff;
 	font-variant-numeric: tabular-nums;
 }
 .entry-cumul-time {
-	font-size: 14px;
+	font-size: 9px; /* scaled down */
 	color: #999;
 	font-variant-numeric: tabular-nums;
 	text-align: right;
@@ -129,17 +135,17 @@ p{
 	flex-direction: column;
 	align-items: flex-end;
 	justify-content: center;
-	min-width: 180px;
-	padding-left: 20px;
-	border-left: 2px solid #555;
+	min-width: 100px; /* reduced */
+	padding-left: 10px;
+	border-left: 1px solid #555;
 }
 #timer-label {
-	font-size: 12px;
+	font-size: 10px;
 	color: #aaa;
-	margin-bottom: 5px;
+	margin-bottom: 2px;
 }
 #timer-display {
-	font-size: 32px;
+	font-size: 18px; /* scaled down */
 	font-weight: bold;
 	color: #fff;
 	font-variant-numeric: tabular-nums;
@@ -147,8 +153,8 @@ p{
 
 #adjust-fps-button {
 	height: 40px;
-	width: 100px;
+	width: 90px;
 	font-weight: bold;
-	font-size: 16px;
+	font-size: 14px;
 	border-width: 2px;
 }
