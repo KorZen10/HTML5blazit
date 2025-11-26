@@ -2980,6 +2980,9 @@ function setQual() {
 }
 
 function exitLevel() {
+	// turn off ability to lead savestate so game won't crash
+	levelHasBeenSaved = false;
+
 	menuScreen = 2;
 }
 
@@ -3317,24 +3320,24 @@ function drawLevelMap() {
 		() => bfdia5b.setItem('timerMod.showPrevTime', bfdia5b.getItem('timerMod.showPrevTime') != 'true'),
 		164.15, 23.20
 	);
-	drawMenu0Button('19', 100, 129.35, false, () => { levelProgress = 18; stopSessionTimer(); }, 
+	drawMenu0Button('19', 100, 129.35, false, () => { levelProgress = 18; resetSessionTimer(); }, 
 		40, 23.20
 	);
-	drawMenu0Button('31', 150, 129.35, false, () => { levelProgress = 30; stopSessionTimer(); }, 
+	drawMenu0Button('31', 150, 129.35, false, () => { levelProgress = 30; resetSessionTimer(); }, 
 		40, 23.20
 	);
-	drawMenu0Button('42', 200, 129.35, false, () => { levelProgress = 41; stopSessionTimer(); }, 
+	drawMenu0Button('42', 200, 129.35, false, () => { levelProgress = 41; resetSessionTimer(); }, 
 		40, 23.20
 	);
-	drawMenu0Button('53', 250, 129.35, false, () => { levelProgress = 52; stopSessionTimer(); }, 
+	drawMenu0Button('53', 250, 129.35, false, () => { levelProgress = 52; resetSessionTimer(); }, 
 		40, 23.20
 	);
 	// drawMenu0Button('+', 300, 129.35, false, () => { levelProgress++; }, 
-	drawMenu0Button('+', 295, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; stopSessionTimer(); }, 
+	drawMenu0Button('+', 295, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; resetSessionTimer(); }, 
 		25, 23.20
 	);
 	// drawMenu0Button('-', 330, 129.35, false, () => { levelProgress--; }, 
-	drawMenu0Button('-', 325, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; stopSessionTimer(); }, 
+	drawMenu0Button('-', 325, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; resetSessionTimer(); }, 
 		25, 23.20
 	);
 	for (let i = 0; i < (playingLevelpack?levelCount:133); i++) {
@@ -3577,6 +3580,7 @@ function fitString(context, str, maxWidth) {
 }
 
 function playLevel(i) {
+	document.getElementById('TEMP').textContent = 'Playing level ' + (i + 1);
 	if (i == levelProgress) playMode = 0;
 	else if (i < levelProgress) playMode = 1;
 	// Start session timer if playing level 1 and timer hasn't started yet
@@ -3833,6 +3837,21 @@ function copyLevel(thatLevel) {
 }
 
 function drawStaticTiles() {
+	// Clear offscreen canvases first so repeated calls (e.g. on loadState)
+	// don't accumulate drawings on top of previous contents
+	if (typeof osctx1 !== 'undefined' && osctx1) {
+		osctx1.save();
+		osctx1.setTransform(1, 0, 0, 1, 0, 0);
+		osctx1.clearRect(0, 0, osc1.width, osc1.height);
+		osctx1.restore();
+	}
+	if (typeof osctx2 !== 'undefined' && osctx2) {
+		osctx2.save();
+		osctx2.setTransform(1, 0, 0, 1, 0, 0);
+		osctx2.clearRect(0, 0, osc2.width, osc2.height);
+		osctx2.restore();
+	}
+
 	for (let j = 0; j < tileDepths[0].length; j++) {
 		addTileMovieClip(tileDepths[0][j].x, tileDepths[0][j].y, osctx1);
 	}
@@ -7962,6 +7981,17 @@ function keydown(event) {
 	}
 
 	if (event.key ===  'g') togglePausePlay();
+
+	// this one's for changing the speed warp
+	if (event.key >= '0' && event.key <= '9') {
+		let correctKey = (event.key > '0') ? event.key : 10;
+		document.getElementById('fpsSlider').value = (correctKey);
+		setFps(correctKey * 6);
+	}
+
+	// saving/loading the savestate
+	if (event.key === 'w') saveState();
+	if (event.key === 'e') loadState();
 }
 
 function keyup(event) {
@@ -8259,7 +8289,7 @@ function draw() {
 							const container = document.getElementById('livesplit-entries');
 							if (container) {
 								const firstEntry = container.querySelector('.livesplit-entry');
-								// if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
+								if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
 									const style = window.getComputedStyle(firstEntry);
 									const marginRight = parseFloat(style.marginRight) || 0;
 									
@@ -8270,7 +8300,7 @@ function draw() {
 									} else {
 										container.scrollLeft += amount;
 									}
-								// }
+								}
 							}
 						} catch (e) {}
 					} catch (e) {}
@@ -8278,6 +8308,8 @@ function draw() {
 						currentLevel++;
 						if (!quirksMode) toSeeCS = true; // This line was absent in the original source, but without it dialogue doesn't play after level 1 when on a normal playthrough.
 						levelProgress = currentLevel;
+						// disable savestates so game doesn't crash when it tries to savestate
+						levelHasBeenSaved = false;
 						if (currentLevel < levelCount) resetLevel();
 						else exitLevel();
 					} else {
@@ -10823,7 +10855,7 @@ function setFps(newFps) {
 	fps = newFps;
 	lastFrameReq = then;
 	interval = 1000 / fps;
-	document.getElementById("TEMP").textContent = fps + " FPS";
+	// document.getElementById("TEMP").textContent = fps + " FPS";
 }
 
 function toggleNoLag() {
@@ -10841,6 +10873,75 @@ function togglePausePlay() {
 		paused = false;
 		setFps(document.getElementById('fpsSlider').value * 6);
 	}
+}
+
+let charBackups = new Array(1);
+let levelTimerBackup = 0;
+let thisLevelBackup = null;
+let controlBackup = 0;
+let recoverTimerBackup = 0;
+let levelHasBeenSaved = false;
+function saveState() {
+	charBackups = new Array(charCount);
+	for (let i = 0; i < charCount; i++) {
+			// make a clone of the characters 
+			// ("structuredClone" makes a deep copy, which we need so state doesn't get overwritten)
+			if (typeof structuredClone === 'function') {
+				charBackups[i] = structuredClone(char[i]);
+			} else {
+				charBackups[i] = JSON.parse(JSON.stringify(char[i]));
+			}
+		// }
+	}
+	// Save current level timer so time-based motion resumes at the same phase when the state is loaded.
+	// This will allow the moving object cycles to be in the same place when loaded
+	levelTimerBackup = levelTimer;
+	if (typeof structuredClone === 'function') {
+		levelTimerBackup = structuredClone(levelTimer);
+	} else {
+		levelTimerBackup = JSON.parse(JSON.stringify(levelTimer));
+	}
+	// Save current level tile state so lever/switch positions don't persist across loads
+	if (typeof structuredClone === 'function') {
+		thisLevelBackup = structuredClone(thisLevel);
+	} else {
+		thisLevelBackup = JSON.parse(JSON.stringify(thisLevel));
+	}
+
+	// Save control/recover timer so control returns to the saved character after loading
+	controlBackup = control;
+	recoverTimerBackup = recoverTimer;
+
+	levelHasBeenSaved = true;
+}
+
+function loadState() {
+	if (!levelHasBeenSaved) return;
+
+	levelTimer = levelTimerBackup;
+
+	// If we have a saved level layout (thisLevelBackup), restore it and rebuild
+	// dependent structures (tileFrames, tileDepths, shadows, static tile canvas).
+	if (thisLevelBackup) {
+		// Rebuild thisLevel and tile-related arrays from the backup.
+		copyLevel(thisLevelBackup);
+		tileDepths = [[], [], [], []];
+		getTileDepths();
+		calculateShadowsAndBorders();
+		drawStaticTiles();
+	}
+
+	// Restore characters from their backups
+	for (let i = 0; i < charCount; i++) {
+		char[i].setVars(charBackups[i]);
+	}
+
+	// Restore control and recover timer so the saved player regains input
+	if (typeof controlBackup !== 'undefined') control = controlBackup;
+	if (typeof recoverTimerBackup !== 'undefined') recoverTimer = recoverTimerBackup;
+
+	resetSessionTimer();
+	document.getElementById('TEMP').textContent = char[i].charState;
 }
 
 // Explore API Stuff
@@ -11177,6 +11278,61 @@ class Character {
 			this.frame = newFrame;
 			if (cutScene == 3 && this.expr != this.dExpr) this.expr = this.dExpr;
 		}
+	}
+
+	// used for savestates; takes the saved character as input and sets this one's vars to that one's
+	setVars(savedData) {
+		document.getElementById('TEMP').textContent = "CALLED!!!";
+		this.id = savedData.id;
+		this.x = savedData.x;
+		this.y = savedData.y;
+		this.px = savedData.px;
+		this.py = savedData.py;
+		this.vx = savedData.vx;
+		this.vy = savedData.vy;
+		this.onob = savedData.onob;
+		this.dire = savedData.dire;
+		this.carry = savedData.carry;
+		this.carryObject = savedData.carryObject;
+		this.carriedBy = savedData.carriedBy;
+		this.landTimer = savedData.landTimer;
+		this.deathTimer = savedData.deathTimer;
+		this.charState = savedData.charState;
+		this.standingOn = savedData.standingOn;
+		this.stoodOnBy = savedData.stoodOnBy
+		this.w = savedData.w;
+		this.h = savedData.h;
+		this.weight = savedData.weight;
+		this.weight2 = savedData.weight2;
+		this.h2 = savedData.h2;
+		this.atEnd = savedData.atEnd;
+		this.friction = savedData.friction;
+		this.fricGoal = savedData.fricGoal;
+		this.justChanged = savedData.justChanged;
+		this.speed = savedData.speed;
+		this.motionString = savedData.motionString
+		this.buttonsPressed = savedData.buttonsPressed
+		this.pcharState = savedData.pcharState;
+		this.submerged = savedData.submerged;
+		this.temp = savedData.temp;
+		this.heated = savedData.heated;
+		this.heatSpeed = savedData.heatSpeed;
+		this.hasArms = savedData.hasArms;
+
+		this.frame = savedData.frame;
+		this.poseTimer = savedData.poseTimer;
+		this.leg1frame = savedData.leg1frame;
+		this.leg2frame = savedData.leg2frame;
+		this.leg1skew = savedData.leg1skew;
+		this.leg2skew = savedData.leg2skew;
+		this.legdire = savedData.legdire;
+		this.legAnimationFrame = savedData.legAnimationFrame; // Animation offset.
+		this.burstFrame = savedData.burstFrame;
+		this.diaMouthFrame = savedData.diaMouthFrame;
+		this.expr = savedData.expr;
+		this.dExpr = savedData.dExpr;
+		this.acidDropTimer = savedData.acidDropTimer;
+		document.getElementById('TEMP').textContent = savedData.x;
 	}
 }
 

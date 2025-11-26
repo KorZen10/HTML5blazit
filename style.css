@@ -95,6 +95,17 @@ p{
 	gap: 5px; /* smaller gap */
 	padding-right: 12px;
 }
+
+/* Hide scrollbars while keeping horizontal scrolling functional */
+#livesplit-entries::-webkit-scrollbar,
+.livesplit-entries::-webkit-scrollbar {
+    display: none;
+}
+#livesplit-entries,
+.livesplit-entries {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+}
 .livesplit-entry {
 	flex-shrink: 0;
 	min-width: 140px; /* smaller entry width */
@@ -151,10 +162,11 @@ p{
 	font-variant-numeric: tabular-nums;
 }
 
-#adjust-fps-button {
+.speedrun-btn {
 	height: 40px;
 	width: 90px;
 	font-weight: bold;
 	font-size: 14px;
 	border-width: 2px;
+	margin-right: 5px;
 }
