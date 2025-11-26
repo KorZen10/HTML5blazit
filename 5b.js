@@ -121,6 +121,9 @@ let screenFlashes = true;
 let frameRateThrottling = false;
 let slowTintsEnabled = true;
 let speedrunPracticeMode = true; // this enables/disables all speedrun features except for the livesplit timer
+// Populate after DOM is ready so getElementById returns real elements.
+let speedrunPracticeBtns = [];
+let fastRestart = false; // speedrun mod thing
 let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode'];
 let levelAlreadySharedToExplore = false;
 let lcSavedLevels;
@@ -231,6 +234,7 @@ function loadFastestRun() {
 
 function saveSettings() {
 	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled, speedrunPracticeMode]));
+	toggleSpeedrunPracticeMode();
 }
 
 function getSavedSettings() {
@@ -2594,6 +2598,22 @@ window.onload = function () {
 	loadingScreen();
 };
 
+// Populate speedrun-related button references once DOM is ready
+document.addEventListener('DOMContentLoaded', function () {
+	try {
+		speedrunPracticeBtns = [
+			document.getElementById('fps-slider'),
+			document.getElementById('pause-play-btn'),
+			document.getElementById('frame-adv-btn'),
+			document.getElementById('save-state-btn'),
+			document.getElementById('load-state-btn'),
+			document.getElementById('fast-restart-btn')
+		];
+	} catch (e) {
+		console.error('Error populating speedrunPracticeBtns', e);
+	}
+});
+
 // https://stackoverflow.com/a/4819886/22438094
 function isTouchDevice() {
 	return (('ontouchstart' in window) ||
@@ -2931,7 +2951,7 @@ function beginNewGame() {
 	// Reset session timer and per-run split state
 	resetSessionTimer();
 	setFps(60);
-	document.getElementById("fpsSlider").value = 10;
+	document.getElementById("fps-slider").value = 10;
 	if (paused) togglePause(); // if game is paused somehow, unpause it
 	sessionSplitTimes = new Array(levelCount).fill(null);
 	sessionCumulTimes = new Array(levelCount).fill(null);
@@ -7982,21 +8002,24 @@ function keydown(event) {
 		}
 	}
 
+	// speedrun mod shortcuts
+	
+	if (speedrunPracticeMode) {
+		// this one's for changing the speed warp
+		if (event.key >= '0' && event.key <= '9') {
+			let correctKey = (event.key > '0') ? event.key : 10;
+			document.getElementById('fps-slider').value = (correctKey);
+			setFps(correctKey * 6);
+		}
 
-	// this one's for changing the speed warp
-	if (event.key >= '0' && event.key <= '9') {
-		let correctKey = (event.key > '0') ? event.key : 10;
-		document.getElementById('fpsSlider').value = (correctKey);
-		setFps(correctKey * 6);
+		// pausing and frame-advancing
+		if (event.key ===  'g') togglePausePlay();
+		if (event.key ===  'h') advanceFrame();
+
+		// saving/loading the savestate
+		if (event.key === 'w') saveState();
+		if (event.key === 'e') loadState();
 	}
-
-	// pausing and frame-advancing
-	if (event.key ===  'g') togglePausePlay();
-	if (event.key ===  'h') advanceFrame();
-
-	// saving/loading the savestate
-	if (event.key === 'w') saveState();
-	if (event.key === 'e') loadState();
 }
 
 function keyup(event) {
@@ -8110,6 +8133,7 @@ function setup() {
 			});
 	} else {
 		rAF60fps();
+		toggleSpeedrunPracticeMode();
 	}
 
 	// Generate Livesplit entries (52) in the UI.
@@ -8471,7 +8495,8 @@ function draw() {
 			}
 
 			if (_keysDown[82] && wipeTimer == 0) {
-				wipeTimer = 1;
+				// if specified fast restarts, set wipeTimer already to 29
+				wipeTimer = (fastRestart) ? 29 : 1;
 				transitionType = 0;
 				// if (cutScene == 1) csBubble.gotoAndPlay(17);
 			}
@@ -10882,10 +10907,11 @@ function togglePausePlay() {
 	if (paused === false) {
 		setFps(0);
 		paused = true;
+		document.getElementById('pause-play-btn').textContent = (paused) ? 'Play (G)' : 'Pause (G)';
 	}
 	else { // paused  === true
 		paused = false;
-		setFps(document.getElementById('fpsSlider').value * 6);
+		setFps(document.getElementById('fps-slider').value * 6);
 	}
 }
 
@@ -10893,6 +10919,42 @@ function advanceFrame() {
 	if (!speedrunPracticeMode) return;
 	if (!paused) return;
 	draw();
+}
+
+function toggleFastRestart() {
+	if (!speedrunPracticeMode) return;
+	fastRestart = !fastRestart;
+	document.getElementById('fast-restart-btn').textContent = (fastRestart) ? 'Disable fast restart' : 'Enable fast restart';
+}
+
+function toggleSpeedrunPracticeMode() {
+	if (!speedrunPracticeMode) {
+		levelHasBeenSaved = false;
+
+		// briefly reenable speedrun practice mode like a mutex to reset this stuff
+		speedrunPracticeMode = true;
+		if (fastRestart) toggleFastRestart();
+		setFps(60);
+		speedrunPracticeMode = false;
+
+		for (let i = 0; i < speedrunPracticeBtns.length; i++) {
+			const btn = speedrunPracticeBtns[i];
+			if (!btn) continue;
+
+			btn.disabled = true;
+			btn.setAttribute('disabled', '');
+		}
+	}
+	else {
+		document.getElementById('TEMP').textContent = 'enabling...';
+		for (let i = 0; i < speedrunPracticeBtns.length; i++) {
+			const btn = speedrunPracticeBtns[i];
+			if (!btn) continue;
+
+			btn.disabled = false;
+			btn.removeAttribute('disabled');
+		}
+	}
 }
 
 let charBackups = new Array(1);
@@ -11307,7 +11369,6 @@ class Character {
 
 	// used for savestates; takes the saved character as input and sets this one's vars to that one's
 	setVars(savedData) {
-		document.getElementById('TEMP').textContent = "CALLED!!!";
 		this.id = savedData.id;
 		this.x = savedData.x;
 		this.y = savedData.y;

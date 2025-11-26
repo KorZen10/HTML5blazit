@@ -48,8 +48,8 @@
 				<div>(Hotkeys: 1-9 + 0)</div>
 			</div>
 			<div>
-				<input id="fpsSlider" tabindex="-1" type="range" min="1" max="10" value="10" class="snap-range-input" style="width: 490px;" 
-					onchange="setFps(document.getElementById('fpsSlider').value*6)" onfocus="this.blur()">
+				<input id="fps-slider" tabindex="-1" type="range" min="1" max="10" value="10" class="snap-range-input" style="width: 350px;" 
+					onchange="setFps(document.getElementById('fps-slider').value*6)" onfocus="this.blur()">
 				<div class="range-tick-labels" style="display: flex; justify-content: center">
 					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 0%;">|<br>10%</span>
 					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 11.11%;">|<br>20%</span>
@@ -63,13 +63,16 @@
 					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 100%;">|<br>100%</span>
 				</div>
 			</div>
+			&nbsp;&nbsp;
 			<!-- <button id="adjust-fps-button" tabindex="-1" onclick="setFps(document.getElementById('fpsSlider').value*6)">Set FPS!</button> -->
-			<button class="speedrun-btn" id="adjust-fps-button" tabindex="-1" onfocus="this.blur()" onclick="togglePausePlay()">Play/Pause (G)</button>
-			<button class="speedrun-btn" id="frame-adv-button" tabindex="-1" onfocus="this.blur()" onclick="advanceFrame()">Advance Frame (H)</button>&nbsp;&nbsp;&nbsp;
+			<button class="speedrun-btn" id="pause-play-btn" tabindex="-1" onfocus="this.blur()" onclick="togglePausePlay()">Play/Pause (G)</button>
+			<button class="speedrun-btn" id="frame-adv-btn" tabindex="-1" onfocus="this.blur()" onclick="advanceFrame()">Advance Frame (H)</button>&nbsp;&nbsp;&nbsp;
 			<button class="speedrun-btn" id="save-state-btn" tabindex="-1" onfocus="this.blur()" onclick="saveState()">Save State (W)</button>
-			<button class="speedrun-btn" id="load-state-btn" tabindex="-1" onfocus="this.blur()" onclick="loadState()">Load State (E)</button>
+			<button class="speedrun-btn" id="load-state-btn" tabindex="-1" onfocus="this.blur()" onclick="loadState()">Load State (E)</button>&nbsp;&nbsp;&nbsp;
+			<button class="speedrun-btn" id="fast-restart-btn" tabindex="-1" onfocus="this.blur()" onclick="toggleFastRestart()">Enable fast restart</button>
 		</div>
 		
+		<!--document.getElementById('TEMP').textContent = -->
 		<div id="TEMP">hi</h1>
 		<div style="display: flex; justify-content: center;">
 			<div id="resetSplitsButton"></div>&nbsp;
