@@ -173,7 +173,7 @@ p{
 }
 
 /* temporary until I figure out why classes aren't working */
-#adjust-fps-button {
+/* #adjust-fps-button {
 	height: 40px;
 	width: 90px;
 	font-weight: bold;
@@ -197,4 +197,11 @@ p{
 	font-weight: bold;
 	font-size: 14px;
 	border-width: 2px;
+} */
+
+.tick-label {
+	width: 32.5px;
+	font-size: 12px;
+	font-weight: bold;
+
 }

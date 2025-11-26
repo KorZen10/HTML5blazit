@@ -114,13 +114,14 @@ let fastestRunCumulTimes = new Array(levelCount).fill(null); // cumulative times
 let fastestRunEntryTimes = new Array(levelCount).fill(null); // entry times (wallclock) from fastest run
 let coins;
 let longMode = false;
-let quirksMode = false;
+let quirksMode = true;
 let enableExperimentalFeatures = window.location.hostname==='localhost';
 let screenShake = true;
 let screenFlashes = true;
-let frameRateThrottling = true;
+let frameRateThrottling = false;
 let slowTintsEnabled = true;
-let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints'];
+let speedrunPracticeMode = true; // this enables/disables all speedrun features except for the livesplit timer
+let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode'];
 let levelAlreadySharedToExplore = false;
 let lcSavedLevels;
 let nextLevelId;
@@ -229,7 +230,7 @@ function loadFastestRun() {
 }
 
 function saveSettings() {
-	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled]));
+	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled, speedrunPracticeMode]));
 }
 
 function getSavedSettings() {
@@ -243,6 +244,7 @@ function getSavedSettings() {
 		enableExperimentalFeatures = settingsArray[3];
 		frameRateThrottling = settingsArray[4];
 		slowTintsEnabled = settingsArray[5];
+	    speedrunPracticeMode = settingsArray[6];
 	}
 }
 
@@ -7980,7 +7982,6 @@ function keydown(event) {
 		}
 	}
 
-	if (event.key ===  'g') togglePausePlay();
 
 	// this one's for changing the speed warp
 	if (event.key >= '0' && event.key <= '9') {
@@ -7988,6 +7989,10 @@ function keydown(event) {
 		document.getElementById('fpsSlider').value = (correctKey);
 		setFps(correctKey * 6);
 	}
+
+	// pausing and frame-advancing
+	if (event.key ===  'g') togglePausePlay();
+	if (event.key ===  'h') advanceFrame();
 
 	// saving/loading the savestate
 	if (event.key === 'w') saveState();
@@ -10497,6 +10502,9 @@ function draw() {
 						break;
 					case 5:
 						thisOptionValue = slowTintsEnabled;
+						break;
+					case 6:
+						thisOptionValue = speedrunPracticeMode;
 				}
 				ctx.fillStyle = thisOptionValue?'#00ff00':'#ff0000';
 				ctx.fillText(thisOptionValue?'on':'off', 615, y+2);
@@ -10522,6 +10530,9 @@ function draw() {
 								break;
 							case 5:
 								slowTintsEnabled = !slowTintsEnabled;
+								break;
+							case 6:
+								speedrunPracticeMode = !speedrunPracticeMode;
 								break;
 						}
 					}
@@ -10849,6 +10860,7 @@ function rAF60fps() {
 }
 
 function setFps(newFps) {
+	if (!speedrunPracticeMode) return;
 	if (paused) return;
 	resetSessionTimer(); // nice try
 	noLag = false;
@@ -10864,6 +10876,8 @@ function toggleNoLag() {
 
 let paused = false;
 function togglePausePlay() {
+	if (!speedrunPracticeMode) return;
+
 	resetSessionTimer(); // nice try
 	if (paused === false) {
 		setFps(0);
@@ -10875,6 +10889,12 @@ function togglePausePlay() {
 	}
 }
 
+function advanceFrame() {
+	if (!speedrunPracticeMode) return;
+	if (!paused) return;
+	draw();
+}
+
 let charBackups = new Array(1);
 let levelTimerBackup = 0;
 let thisLevelBackup = null;
@@ -10882,16 +10902,17 @@ let controlBackup = 0;
 let recoverTimerBackup = 0;
 let levelHasBeenSaved = false;
 function saveState() {
+	if (!speedrunPracticeMode) return;
+
 	charBackups = new Array(charCount);
 	for (let i = 0; i < charCount; i++) {
-			// make a clone of the characters 
-			// ("structuredClone" makes a deep copy, which we need so state doesn't get overwritten)
-			if (typeof structuredClone === 'function') {
-				charBackups[i] = structuredClone(char[i]);
-			} else {
-				charBackups[i] = JSON.parse(JSON.stringify(char[i]));
-			}
-		// }
+		// make a clone of the characters 
+		// ("structuredClone" makes a deep copy, which we need so state doesn't get overwritten)
+		if (typeof structuredClone === 'function') {
+			charBackups[i] = structuredClone(char[i]);
+		} else {
+			charBackups[i] = JSON.parse(JSON.stringify(char[i]));
+		}
 	}
 	// Save current level timer so time-based motion resumes at the same phase when the state is loaded.
 	// This will allow the moving object cycles to be in the same place when loaded
@@ -10916,6 +10937,7 @@ function saveState() {
 }
 
 function loadState() {
+	if (!speedrunPracticeMode) return;
 	if (!levelHasBeenSaved) return;
 
 	levelTimer = levelTimerBackup;
@@ -10939,6 +10961,9 @@ function loadState() {
 	// Restore control and recover timer so the saved player regains input
 	if (typeof controlBackup !== 'undefined') control = controlBackup;
 	if (typeof recoverTimerBackup !== 'undefined') recoverTimer = recoverTimerBackup;
+
+	// advance to next frame so that we can actually see the load happen
+	advanceFrame();
 
 	resetSessionTimer();
 	document.getElementById('TEMP').textContent = char[i].charState;
