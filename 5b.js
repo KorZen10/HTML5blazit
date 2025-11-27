@@ -2336,45 +2336,6 @@ function createResetSplitsButton() {
 	}
 }
 
-function clearFastestRun() {
-	try {
-		// Clear in-memory values
-		fastestRunTime = null;
-		fastestRunCumulTimes = new Array(levelCount).fill(null);
-		fastestRunEntryTimes = new Array(levelCount).fill(null);
-		// Remove from localStorage
-		try { bfdia5b.removeItem('fastestRunTime'); } catch (e) {}
-		try { bfdia5b.removeItem('fastestRunCumulTimes'); } catch (e) {}
-		try { bfdia5b.removeItem('fastestRunEntryTimes'); } catch (e) {}
-		// Update UI
-		updateAllLivesplitEntries();
-		console.log('Cleared fastest run data');
-	} catch (e) {
-		console.error('Failed to clear fastest run data', e);
-	}
-}
-
-function createClearSplitsButton() {
-	try {
-		const container = document.getElementById('clearSplitsButton');
-		if (!container) return;
-		container.innerHTML = '';
-		const btn = document.createElement('button');
-		btn.type = 'button';
-		btn.id = 'clearSplitsFromStorage';
-		btn.textContent = 'Clear Fastest Run Data';
-		btn.addEventListener('click', () => {
-			// Confirm the user action
-			if (confirm('Clear fastest run data from storage? This cannot be undone.')) {
-				clearFastestRun();
-			}
-		});
-		container.appendChild(btn);
-	} catch (e) {
-		// ignore
-	}
-}
-
 // I missed processing's map() function so much I wrote my own that I think I stole parts of from stackoverflow, but didn't link to.
 function mapRange(value, min1, max1, min2, max2) {
 	return min2 + ((value - min1) / (max1 - min1)) * (max2 - min2);
@@ -3386,7 +3347,8 @@ function drawLevelButtons() {
 	ctx.textAlign = 'left';
 	ctx.textBaseline = 'top';
 	ctx.font = 'bold 32px Helvetica';
-	ctx.fillText(currentLevelDisplayName, 12.85, 495.45);
+	if (speedrunPracticeMode) ctx.fillText(currentLevelDisplayName, 12.85, 502.45);
+	else ctx.fillText(currentLevelDisplayName, 12.85, 495.45);
 	drawMenu2_3Button(0, 837.5, 486.95, playMode == 3 ? exitExploreLevel : playMode == 2 ? exitTestLevel : menu3Menu);
 }
 function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha = 0.6) {
@@ -8003,7 +7965,6 @@ function keydown(event) {
 	}
 
 	// speedrun mod shortcuts
-	
 	if (speedrunPracticeMode) {
 		// this one's for changing the speed warp
 		if (event.key >= '0' && event.key <= '9') {
@@ -8211,15 +8172,11 @@ function setup() {
 		window.addEventListener('DOMContentLoaded', () => {
 			createLivesplitEntries();
 			updateAllLivesplitEntries();
-			createResetSplitsButton();
-			createClearSplitsButton();
 		});
 	} else {
 		// Document already ready
 		createLivesplitEntries();
 		updateAllLivesplitEntries();
-		createResetSplitsButton();
-		createClearSplitsButton();
 	}
 }
 
@@ -8621,6 +8578,7 @@ function draw() {
 								) {
 									if (Math.floor(char[i].x / 30) == x) {
 										let rot = (char[i].x - Math.floor(char[i].x / 30) * 30 - 15) * 5;
+										document.getElementById('TEMP').textContent = rot;
 										if (
 											(rot < tileFrames[y][x].rotation && char[i].vx < 0) ||
 											(rot > tileFrames[y][x].rotation && char[i].vx > 0)
@@ -10885,7 +10843,6 @@ function rAF60fps() {
 }
 
 function setFps(newFps) {
-	if (!speedrunPracticeMode) return;
 	if (paused) return;
 	resetSessionTimer(); // nice try
 	noLag = false;
@@ -10901,7 +10858,6 @@ function toggleNoLag() {
 
 let paused = false;
 function togglePausePlay() {
-	if (!speedrunPracticeMode) return;
 
 	resetSessionTimer(); // nice try
 	if (paused === false) {
@@ -10916,13 +10872,11 @@ function togglePausePlay() {
 }
 
 function advanceFrame() {
-	if (!speedrunPracticeMode) return;
 	if (!paused) return;
 	draw();
 }
 
 function toggleFastRestart() {
-	if (!speedrunPracticeMode) return;
 	fastRestart = !fastRestart;
 	document.getElementById('fast-restart-btn').textContent = (fastRestart) ? 'Disable fast restart' : 'Enable fast restart';
 }
@@ -10957,49 +10911,45 @@ function toggleSpeedrunPracticeMode() {
 	}
 }
 
-let charBackups = new Array(1);
-let levelTimerBackup = 0;
-let thisLevelBackup = null;
-let controlBackup = 0;
-let recoverTimerBackup = 0;
-let levelHasBeenSaved = false;
+let charBackups = new Array(1); // characters
+let levelTimerBackup = 0; // things like cycles of moving objects
+let thisLevelBackup = null; // things like whether a lever/button is active or not
+let tileFramesBackup = null; // things like lever and button positions
+let controlBackup = 0; // which character is being controlled
+let recoverTimerBackup = 0; // death fade-out
+let recoverBackup = false;
+let recover2Backup = 0;
+
+let levelHasBeenSaved = false; // check for whether a load is valid here or not
 function saveState() {
-	if (!speedrunPracticeMode) return;
 
 	charBackups = new Array(charCount);
 	for (let i = 0; i < charCount; i++) {
 		// make a clone of the characters 
 		// ("structuredClone" makes a deep copy, which we need so state doesn't get overwritten)
-		if (typeof structuredClone === 'function') {
-			charBackups[i] = structuredClone(char[i]);
-		} else {
-			charBackups[i] = JSON.parse(JSON.stringify(char[i]));
-		}
+		charBackups[i] = structuredClone(char[i]);
 	}
 	// Save current level timer so time-based motion resumes at the same phase when the state is loaded.
 	// This will allow the moving object cycles to be in the same place when loaded
-	levelTimerBackup = levelTimer;
-	if (typeof structuredClone === 'function') {
-		levelTimerBackup = structuredClone(levelTimer);
-	} else {
-		levelTimerBackup = JSON.parse(JSON.stringify(levelTimer));
-	}
+	levelTimerBackup = structuredClone(levelTimer);
+
 	// Save current level tile state so lever/switch positions don't persist across loads
-	if (typeof structuredClone === 'function') {
-		thisLevelBackup = structuredClone(thisLevel);
-	} else {
-		thisLevelBackup = JSON.parse(JSON.stringify(thisLevel));
-	}
+	thisLevelBackup = structuredClone(thisLevel);
 
 	// Save control/recover timer so control returns to the saved character after loading
-	controlBackup = control;
-	recoverTimerBackup = recoverTimer;
+	controlBackup = structuredClone(control);
+	recoverTimerBackup = structuredClone(recoverTimer);
 
 	levelHasBeenSaved = true;
+
+	// save tile states
+	tileFramesBackup = structuredClone(tileFrames);
+
+	recoverBackup = structuredClone(recover);
+	recover2Backup = structuredClone(recover2);
 }
 
 function loadState() {
-	if (!speedrunPracticeMode) return;
 	if (!levelHasBeenSaved) return;
 
 	levelTimer = levelTimerBackup;
@@ -11014,6 +10964,9 @@ function loadState() {
 		calculateShadowsAndBorders();
 		drawStaticTiles();
 	}
+
+	// restore the tile states
+	tileFrames = tileFramesBackup;
 
 	// Restore characters from their backups
 	for (let i = 0; i < charCount; i++) {

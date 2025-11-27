@@ -170,37 +170,11 @@ p{
 	font-size: 14px;
 	border-width: 2px;
 	margin-right: 5px;
+	border-radius: 5px;
 }
-
-/* temporary until I figure out why classes aren't working */
-/* #adjust-fps-button {
-	height: 40px;
-	width: 90px;
-	font-weight: bold;
-	font-size: 14px;
-	border-width: 2px;
-	margin-right: 5px;
-}
-
-#save-state-btn {
-	height: 40px;
-	width: 90px;
-	font-weight: bold;
-	font-size: 14px;
-	border-width: 2px;
-	margin-right: 5px;
-}
-
-#load-state-btn {
-	height: 40px;
-	width: 90px;
-	font-weight: bold;
-	font-size: 14px;
-	border-width: 2px;
-} */
 
 .tick-label {
-	width: 17px;
+	width: 12px;
 	font-size: 12px;
 	font-weight: bold;
 
