@@ -8171,17 +8171,17 @@ function mouseup(event) {
 }
 
 // in the case that you try to remap a key to one already in use, say no
-function compareOtherKeys(code, isGrabExtra) {
+function compareOtherKeys(code, isGrab) {
 	document.getElementById('TEMP').textContent = (code == keyMappings.jump) ? 'true' : 'false';
 	if (code == keyMappings.jump) return true;
 	else if (code == keyMappings.switch) return true;
 	else if (code == keyMappings.reset) return true;
 	else if (code == keyMappings.left) return true;
 	else if (code == keyMappings.right) return true;
-	else if (code == keyMappings.grab && !isGrabExtra) return true;
+	else if (code == keyMappings.grab && !isGrab) return true;
 	else if (code == keyMappings.drop) return true;
 	else if (code == keyMappings.talk) return true;
-	else if (code == keyMappings.grabExtra) return true;
+	else if (code == keyMappings.grabExtra && !isGrab) return true;
 	return false;
 }
 
@@ -8215,7 +8215,7 @@ function keydown(event) {
 					keyMappings.right = code;
 					break;
 				case 5:
-					if (compareOtherKeys(code, false)) break;
+					if (compareOtherKeys(code, true)) break;
 					keyMappings.grab = code;
 					break;
 				case 6:
