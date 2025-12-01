@@ -2561,18 +2561,15 @@ window.onload = function () {
 
 // Populate speedrun-related button references once DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
-	try {
-		speedrunPracticeBtns = [
-			document.getElementById('fps-slider'),
-			document.getElementById('pause-play-btn'),
-			document.getElementById('frame-adv-btn'),
-			document.getElementById('save-state-btn'),
-			document.getElementById('load-state-btn'),
-			document.getElementById('fast-restart-btn')
-		];
-	} catch (e) {
-		console.error('Error populating speedrunPracticeBtns', e);
-	}
+	speedrunPracticeBtns = [
+		document.getElementById('fps-slider'),
+		document.getElementById('pause-play-btn'),
+		document.getElementById('frame-adv-btn'),
+		document.getElementById('save-state-btn'),
+		document.getElementById('load-state-btn'),
+		document.getElementById('fast-restart-btn'),
+		document.getElementById('toggle-stay-btn'),
+	];
 });
 
 // https://stackoverflow.com/a/4819886/22438094
@@ -3362,9 +3359,17 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 	ctx.fillText('Best:', x, y + 34 * scale);
 	ctx.fillText('Total:', x, y + 34 * 2 * scale);
 	ctx.fillText(timer, x + 80 * scale, y);
+
+	// Draw best/total in default (white) color
+	ctx.fillStyle = '#ffffff';
 	ctx.fillText(best, x + 80 * scale, y + 34 * scale);
 	ctx.fillText(total, x + 80 * scale, y + 34 * 2 * scale);
 	ctx.globalAlpha = 1;
+}
+// this is the timer for the speedrun mod; stop session timer but remain in level and render timer green
+function stopTimerButStay() {
+	stayTimerActive = true;
+	freezeLevelTimer = true;
 }
 var keyCoordinateMatrix = {
 	90: [ [ 12.35, 17.00, 53.15, 52.40 ] ],
@@ -3587,6 +3592,10 @@ function playLevel(i) {
 }
 
 function resetLevel() {
+	// when resetting/entering a level, clear any stay/beat/freeze state
+	levelBeat = false;
+	stayTimerActive = false;
+	freezeLevelTimer = false;
 	HPRCBubbleFrame = 0;
 	tileDepths = [[], [], [], []];
 	if (playMode == 2) {
@@ -8180,6 +8189,11 @@ function setup() {
 	}
 }
 
+let stayInLevel = false; // this function only used for speedrun mod button to stay in level after completing it
+let levelBeat = false; // also just for speedrun mod
+let stayTimerActive = false; // true when stopTimerButStay() has stopped the session timer but we're staying in-level
+let freezeLevelTimer = false; // explicitly freeze levelTimer increments when true
+
 function draw() {
 	onButton = false;
 	hoverText = '';
@@ -8210,18 +8224,12 @@ function draw() {
 			break;
 
 		case 3:
-			// TODO: Look into if it would be more accurate to the Flash version if this were moved to after the game logic.
-			// ctx.drawImage(
-			// 	osc4,
-			// 	-Math.floor((Math.max(cameraX, 0) + shakeX) / 1.5 + (cameraX < 0 ? cameraX / 3 : 0)),
-			// 	-Math.floor((Math.max(cameraY, 0) + shakeY) / 1.5 + (cameraY < 0 ? cameraY / 3 : 0)),
-			// 	osc4.width / pixelRatio,
-			// 	osc4.height / pixelRatio
-			// );
 			ctx.drawImage(osc4, -Math.floor(-cameraX + shakeX) + Math.floor( (-cameraX+shakeX)/3), -Math.floor(-cameraY + shakeY) + Math.floor( Math.max( -cameraY/3 - ((bgXScale>bgYScale)?Math.max(0,(bgXScale*5.4-540)/2):0), 540 - osc4.height / pixelRatio) + shakeY/3), osc4.width / pixelRatio, osc4.height / pixelRatio);
 			drawLevel(ctx);
 
-			if (wipeTimer == 30) {
+			if (wipeTimer == 30) levelBeat = true;
+
+			if (levelBeat && !stayInLevel) {
 				if (transitionType == 0) {
 					// resetting preexisting level
 					// timer mod: took this OUT of quirks mode
@@ -8313,6 +8321,10 @@ function draw() {
 					saveGame();
 				}
 			}
+			else if (stayInLevel && levelBeat) {
+				stopTimerButStay();
+			}
+			document.getElementById('TEMP').textContent = levelTimer;
 
 			if (cutScene == 1 || cutScene == 2) {
 				if (_keysDown[13] || _keysDown[16]) {
@@ -8951,7 +8963,8 @@ function draw() {
 				shakeX = 0;
 				shakeY = 0;
 			}
-			levelTimer++;
+			// Only advance the internal level timer when not frozen by a stay-in-level state
+			if (!freezeLevelTimer) levelTimer++;
 			break;
 
 		case 5:
@@ -10109,7 +10122,8 @@ function draw() {
 				ctx.globalAlpha = 1;
 			}
 
-			levelTimer++;
+			// Only advance the internal level timer when not frozen by a stay-in-level state
+			if (!freezeLevelTimer) levelTimer++;
 			if (lcPopUpNextFrame) lcPopUp = true;
 			lcPopUpNextFrame = false;
 			break;
@@ -10863,12 +10877,12 @@ function togglePausePlay() {
 	if (paused === false) {
 		setFps(0);
 		paused = true;
-		document.getElementById('pause-play-btn').textContent = (paused) ? 'Play (G)' : 'Pause (G)';
 	}
 	else { // paused  === true
 		paused = false;
 		setFps(document.getElementById('fps-slider').value * 6);
 	}
+	// document.getElementById('pause-play-btn').textContent = (paused) ? 'Play (G)' : 'Pause (G)';
 }
 
 function advanceFrame() {
@@ -10879,6 +10893,12 @@ function advanceFrame() {
 function toggleFastRestart() {
 	fastRestart = !fastRestart;
 	document.getElementById('fast-restart-btn').textContent = (fastRestart) ? 'Disable fast restart' : 'Enable fast restart';
+}
+
+function toggleStayInLevel() {
+	stayInLevel = !stayInLevel;
+	// document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave level after exit' : 'Stay in level after exit';
+	document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave after exit (WIP)' : 'Stay after exit (WIP)';
 }
 
 function toggleSpeedrunPracticeMode() {
