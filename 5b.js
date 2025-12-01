@@ -10929,8 +10929,8 @@ function toggleFastRestart() {
 
 function toggleStayInLevel() {
 	stayInLevel = !stayInLevel;
-	// document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave level after exit' : 'Stay in level after exit';
-	document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave after exit (WIP)' : 'Stay after exit (WIP)';
+	// document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave level after finish' : 'Stay in level after finish';
+	document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave after finish (WIP)' : 'Stay after finish (WIP)';
 }
 
 function toggleSpeedrunPracticeMode() {
