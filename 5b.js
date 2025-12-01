@@ -125,6 +125,65 @@ let speedrunPracticeMode = true; // this enables/disables all speedrun features 
 let speedrunPracticeBtns = [];
 let fastRestart = false; // speedrun mod thing
 let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode'];
+
+// speedrun mod:
+let keyRemapsText = ['Jump','Switch player','Reset level','Move left','Move right', 'Grab/Throw object', 'Drop object', 'Advance dialogue', 'Additional "up" input'];
+let keyMappings = {jump: 32, switch: 90, reset: 82, left: 37, right: 39, grab: 38, drop: 40, talk: 13, grabExtra: 38};
+
+// When the layout editor asks the player to remap a control, this holds the index
+// of the action currently awaiting a keypress, or null when not listening.
+let keyRemapListeningIndex = null;
+
+// Helper: convert a keyCode to a short readable symbol for display on key visualization.
+function keyCodeToSymbol(code) {
+	if (code == null || typeof code === 'undefined') return '';
+	// Arrow keys and common symbols
+	const symbols = {
+		32: '⎵', 13: '⏎', 27: 'Esc', 9: 'Tab', 16: '⇧', 17: 'Ctrl', 18: 'Alt',
+		37: '←', 38: '↑', 39: '→', 40: '↓',
+		8: '⌫', 46: 'Del'
+	};
+	if (symbols[code]) return symbols[code];
+	// Letters & numbers: convert to lowercase character
+	if ((code >= 65 && code <= 90)) return String.fromCharCode(code).toLowerCase();
+	if ((code >= 48 && code <= 57)) return String.fromCharCode(code);
+	return String.fromCharCode(code).toLowerCase();
+}
+
+// Helper: convert a keyCode to a readable label for display in the remap UI.
+function keyCodeToLabel(code) {
+	if (code == null || typeof code === 'undefined') return '—';
+	// common named keys
+	const names = {
+		32: 'Space', 13: 'Enter', 27: 'Esc', 9: 'Tab', 16: 'Shift', 17: 'Ctrl', 18: 'Alt',
+		37: '←', 38: '↑', 39: '→', 40: '↓',
+		8: 'Backspace', 46: 'Del'
+	};
+	if (names[code]) return names[code];
+	// Letters & numbers (fallback): use fromCharCode if in printable range
+	if ((code >= 48 && code <= 90) || (code >= 96 && code <= 111)) {
+		try { return String.fromCharCode(code); } catch (e) { /* fallthrough */ }
+	}
+	return 'Key ' + code;
+}
+
+// Generate keyMapNames array dynamically from current keyMappings
+// Order: [jump, switch, reset, [empty], grab, left, drop, right, talk, grabExtra]
+function getKeyMapNames() {
+	return [
+		keyCodeToSymbol(keyMappings.jump),
+		keyCodeToSymbol(keyMappings.switch),
+		keyCodeToSymbol(keyMappings.reset),
+		'', // empty slot for visual spacing
+		keyCodeToSymbol(keyMappings.grab),
+		keyCodeToSymbol(keyMappings.left),
+		keyCodeToSymbol(keyMappings.drop),
+		keyCodeToSymbol(keyMappings.right),
+		keyCodeToSymbol(keyMappings.talk),
+		keyCodeToSymbol(keyMappings.grabExtra),
+	];
+}
+
 let levelAlreadySharedToExplore = false;
 let lcSavedLevels;
 let nextLevelId;
@@ -248,7 +307,19 @@ function getSavedSettings() {
 		enableExperimentalFeatures = settingsArray[3];
 		frameRateThrottling = settingsArray[4];
 		slowTintsEnabled = settingsArray[5];
-	    speedrunPracticeMode = settingsArray[6];
+		speedrunPracticeMode = settingsArray[6];
+	}
+	// Load persisted key mappings (supports new JSON object/array format and legacy comma list)
+	const savedKeyMappingsRaw = bfdia5b.getItem('timerMod.keyMappings');
+	if (savedKeyMappingsRaw) {
+		const parsedKM = JSON.parse(savedKeyMappingsRaw);
+		if (Array.isArray(parsedKM) || (parsedKM && typeof parsedKM === 'object')) {
+			keyMappings = parsedKM;
+		} else {
+			// fallback to legacy CSV format
+			const parts = savedKeyMappingsRaw.split(',').map(s => parseInt(s, 10));
+			if (parts.length === keyMappings.length && parts.every(p => !isNaN(p))) keyMappings = parts;
+		}
 	}
 }
 
@@ -2453,7 +2524,7 @@ async function loadingScreen() {
 	ctxReal.scale(pixelRatio, pixelRatio);
 
 	// Background
-	ctx.fillStyle = '#999966';
+	ctx.fillStyle = '#245A98';
 	ctx.fillRect(0, 0, cwidth, cheight);
 	// Text
 	ctx.fillStyle = '#000000';
@@ -2598,6 +2669,39 @@ function setHoverText() {
 	if (canvas.getAttribute('title') != hoverText) {
 		if (hoverText == '') canvas.removeAttribute('title');
 		else canvas.setAttribute('title', hoverText);
+	}
+}
+
+function getSavedSettings() {
+	if (bfdia5b.getItem('settings') == undefined) {
+		saveSettings();
+	} else {
+		let settingsArray = JSON.parse(bfdia5b.getItem('settings'));
+		screenShake = settingsArray[0];
+		screenFlashes = settingsArray[1];
+		quirksMode = settingsArray[2];
+		enableExperimentalFeatures = settingsArray[3];
+		frameRateThrottling = settingsArray[4];
+		slowTintsEnabled = settingsArray[5];
+		speedrunPracticeMode = settingsArray[6];
+	}
+
+	// Load persisted key mappings (supports JSON arrays/objects and the legacy comma list)
+	const savedKeyMappingsRaw = bfdia5b.getItem('timerMod.keyMappings');
+	if (savedKeyMappingsRaw) {
+		// Try JSON parse first (object or array). Fall back to legacy comma-separated list.
+		try {
+			const parsedKM = JSON.parse(savedKeyMappingsRaw);
+			if (Array.isArray(parsedKM) || (parsedKM && typeof parsedKM === 'object')) {
+				keyMappings = parsedKM;
+			} else {
+				const parts = savedKeyMappingsRaw.split(',').map(s => parseInt(s, 10));
+				if (parts.length === keyMappings.length && parts.every(p => !isNaN(p))) keyMappings = parts;
+			}
+		} catch (e) {
+			const parts = savedKeyMappingsRaw.split(',').map(s => parseInt(s, 10));
+			if (parts.length === keyMappings.length && parts.every(p => !isNaN(p))) keyMappings = parts;
+		}
 	}
 }
 
@@ -3398,37 +3502,58 @@ function stopTimerButStay() {
 	stayTimerActive = true;
 	freezeLevelTimer = true;
 }
-var keyCoordinateMatrix = {
-	90: [ [ 12.35, 17.00, 53.15, 52.40 ] ],
-	82: [ [ 86.10, 17.00, 53.15, 52.40 ] ],
-	32: [ [ -16.00, 74.00, 181.55, 53.00 ] ],
-	38: [ [ 240.00, 13.85, 58.10, 57.25 ] ],
-	37: [ [ 180.00, 72.75, 58.10, 57.25 ] ],
-	40: [ [ 240.00, 72.75, 58.10, 57.25 ] ],
-	39: [ [ 300.00, 72.75, 58.10, 57.25 ] ],
-	13: [ [ 364.65, 17.00, 13.90, 38.00 ], [ 377.65, 17.00, 49.40, 92.10 ] ]
-};
+// Build keyCoordinateMatrix dynamically from current keyMappings
+function getKeyCoordinateMatrix() {
+	const matrix = {};
+	// Map action names to their visual coordinates
+	const coords = {
+		switch: [ [ 12.35, 17.00, 53.15, 52.40 ] ],
+		reset: [ [ 86.10, 17.00, 53.15, 52.40 ] ],
+		jump: [ [ -16.00, 74.00, 181.55, 53.00 ] ],
+		grabExtra: [ [ 305.00, 18.75, 48.00, 47.00 ] ], // grabExtra is right before grab so grab overwrites it if they're the same key
+		grab: [ [ 240.00, 13.85, 58.10, 57.25 ] ],
+		left: [ [ 180.00, 72.75, 58.10, 57.25 ] ],
+		drop: [ [ 240.00, 72.75, 58.10, 57.25 ] ],
+		right: [ [ 300.00, 72.75, 58.10, 57.25 ] ],
+		talk: [ [ 364.65, 17.00, 13.90, 38.00 ], [ 377.65, 17.00, 49.40, 92.10 ] ],
+	};
+	// Build matrix using current keycodes from keyMappings
+	for (const action in coords) {
+		const keyCode = keyMappings[action];
+		if (keyCode != null) matrix[keyCode] = coords[action];
+	}
+	return matrix;
+}
 function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
 	if (bfdia5b.getItem('timerMod.showKeys') == '0') return;
 	
+	const keyCoordinateMatrix = getKeyCoordinateMatrix();
 	ctx.globalAlpha = alpha;
 	for (var key of Object.keys(keyCoordinateMatrix)) {
 		ctx.fillStyle = _keysDown[key] ? '#0033CC' : '#666666';
-		if (key == 13 && _keysDown[16]) ctx.fillStyle = '#0033CC';
+		// Shift+Enter also highlights the talk key
+		if (key == _keysDown[13] && _keysDown[16]) ctx.fillStyle = '#0033CC';
 		var coords = keyCoordinateMatrix[key];
 		for (var coord of coords) ctx.fillRect(x + coord[0] * scale, y + coord[1] * scale, coord[2] * scale, coord[3] * scale);
 	}
 	ctx.fillStyle = '#000000';
 	ctx.textAlign = 'center';
 	ctx.font = `${32 * scale}px Helvetica`;
-	ctx.fillText(keys[0], x + 13.35 * scale + 53.15/2 * scale, y + 26.00 * scale);
-	ctx.fillText(keys[1], x + 87.10 * scale + 53.15/2 * scale, y + 26.00 * scale);
-	ctx.fillText(keys[2], x - 15.00 * scale + 181.55/2 * scale, y + 85.00 * scale);
-	ctx.fillText(keys[3], x + 241.00 * scale + 58.10/2 * scale, y + 24.85 * scale);
-	ctx.fillText(keys[4], x + 181.00 * scale + 58.10/2 * scale, y + 83.75 * scale);
-	ctx.fillText(keys[5], x + 241.00 * scale + 58.10/2 * scale, y + 83.75 * scale);
-	ctx.fillText(keys[6], x + 301.00 * scale + 58.10/2 * scale, y + 83.75 * scale);
-	ctx.fillText(keys[7], x + 377.65 * scale + 49.40/2 * scale, y + 58.00 * scale);
+	// keys array order matches keyMapNames: [jump(⎵), switch(z), reset(r), [empty], grab(↑), left(←), drop(↓), right(→), grabExtra, talk(⏎)]
+	// Visual positions: switch, reset, jump, grab(up), left, drop(down), right, talk, grabExtra
+	ctx.fillText(keys[1] || '', x + 13.35 * scale + 53.15/2 * scale, y + 26.00 * scale); // switch
+	ctx.fillText(keys[2] || '', x + 87.10 * scale + 53.15/2 * scale, y + 26.00 * scale); // reset
+	ctx.fillText(keys[0] || '', x - 15.00 * scale + 181.55/2 * scale, y + 85.00 * scale); // jump
+	ctx.fillText(keys[4] || '', x + 241.00 * scale + 58.10/2 * scale, y + 24.85 * scale); // grab (up)
+	ctx.fillText(keys[5] || '', x + 181.00 * scale + 58.10/2 * scale, y + 83.75 * scale); // left
+	ctx.fillText(keys[6] || '', x + 241.00 * scale + 58.10/2 * scale, y + 83.75 * scale); // drop (down)
+	ctx.fillText(keys[7] || '', x + 301.00 * scale + 58.10/2 * scale, y + 83.75 * scale); // right
+	ctx.fillText(keys[8] || '', x + 377.65 * scale + 49.40/2 * scale, y + 58.00 * scale); // talk
+	// grabExtra - smaller font size
+	const prevFont = ctx.font;
+	ctx.font = `${24 * scale}px Helvetica`;
+	ctx.fillText(keys[9] || '', x + 305.00 * scale + 48.00/2 * scale, y + 27.75 * scale); // grabExtra (smaller)
+	ctx.font = prevFont;
 	ctx.globalAlpha = 1;
 }
 
@@ -3436,12 +3561,12 @@ var levelTimerOffset, levelKeysOffset;
 var lastHover = 't';
 var tPress = false, yPress = false;
 function runLayoutEditor() {
-	ctx.fillStyle = '#999966';
+	ctx.fillStyle = '#245A98';
 	ctx.fillRect(0, 0, cwidth, cheight);
 	currentLevelDisplayName = 'Drag to organize; R to reset';
 	drawLevelButtons();
 
-	if (_keysDown[82]) {
+	if (_keysDown[82] && keyRemapListeningIndex === null) { // don't wanna reset layout if just assigning a key
 		bfdia5b.setItem('timerMod.showTimer', 1);
 		bfdia5b.setItem('timerMod.showKeys', 1);
 		bfdia5b.setItem('timerMod.levelTimerPos', '6,6');
@@ -3504,6 +3629,97 @@ function runLayoutEditor() {
 	bfdia5b.setItem('timerMod.levelKeysPos', `${levelKeysX.toFixed(3)},${levelKeysY.toFixed(3)}`);
 	bfdia5b.setItem('timerMod.levelKeysScale', levelKeysScale.toFixed(2));
 	bfdia5b.setItem('timerMod.levelKeysAlpha', levelKeysAlpha.toFixed(2));
+
+	// TODO speedrun mod key remap instructions:
+	// 1) figure out how to make the key remap prompts visible (look into the options page for this) ✅
+
+	// Key remapping panel: centered on screen. Display each action name and its editable mapping box.
+	const rowH = 40;
+	const rows = keyRemapsText.length;
+	const panelH = rows * rowH;
+	const startY = Math.floor((cheight - panelH) / 2);
+	const mapW = 200;
+	const mapX = Math.floor(cwidth / 2 - mapW / 2);
+	const labelX = mapX - 20; // action name sits just to the left of the mapping box
+	// Standardize text size for this menu
+	const __prevFont = ctx.font;
+	ctx.font = '18px Helvetica';
+	for (var i = 0; i < keyRemapsText.length; i++) {
+		let y = startY + i * rowH;
+
+		// Action name (right-aligned), centered as a unit with its mapping box
+		ctx.fillStyle = '#ffffff';
+		ctx.textAlign = 'right';
+		ctx.fillText(keyRemapsText[i], labelX, y + 2);
+
+		// Mapping display area (box centered horizontally)
+		ctx.fillStyle = (keyRemapListeningIndex === i) ? '#3399ff' : '#444444';
+		ctx.fillRect(mapX, y, mapW, 28);
+
+		// Current mapping label or listening prompt
+		ctx.fillStyle = '#ffffff';
+		ctx.textAlign = 'center';
+		let label = '';
+		if (keyRemapListeningIndex === i) label = 'Press any key...';
+		else {
+			switch(i) {
+				case 0:
+					label = keyCodeToLabel(keyMappings.jump);
+					break;
+				case 1:
+					label = keyCodeToLabel(keyMappings.switch);
+					break;
+				case 2:
+					label = keyCodeToLabel(keyMappings.reset);
+					break;
+				case 3:
+					label = keyCodeToLabel(keyMappings.left);
+					break;
+				case 4:
+					label = keyCodeToLabel(keyMappings.right);
+					break;
+				case 5:
+					label = keyCodeToLabel(keyMappings.grab);
+					break;
+				case 6:
+					label = keyCodeToLabel(keyMappings.drop);
+					break;
+				case 7:
+					label = keyCodeToLabel(keyMappings.talk);
+					break;
+				case 8:
+					label = keyCodeToLabel(keyMappings.grabExtra);
+					break;
+			}
+		}
+		
+		keyCodeToLabel(keyMappings[i]);
+		ctx.fillText(label, mapX + mapW / 2, y + 2);
+
+		// Instructional text to the right of the box
+		ctx.textAlign = 'left';
+		ctx.fillStyle = '#ffffff';
+		ctx.fillText('(Click to edit)', mapX + mapW + 10, y + 2);
+
+		// Click -> toggle listening for a key press for this mapping
+		if (onRect(_xmouse, _ymouse, mapX, y, mapW, 28)) {
+			onButton = true;
+			if (mouseIsDown && !pmouseIsDown) {
+				// If already listening to this same mapping, cancel listening; else start/switch to this mapping
+				if (keyRemapListeningIndex === i) {
+					keyRemapListeningIndex = null;
+				} else {
+					keyRemapListeningIndex = i;
+				}
+			}
+		}
+	}
+	// Restore previous font after drawing remap panel
+	ctx.font = __prevFont;
+	// 2) make array (maybe?) that hold the words for these options ✅
+	// 3) make an array that holds the keycodes and their button images for these options ✅
+	// 4) make these variables update once the key remap has been established
+	// 5) save these changes to local storage
 }
 
 //https://thewebdev.info/2021/05/15/how-to-add-line-breaks-into-the-html5-canvas-with-filltext/
@@ -7798,7 +8014,7 @@ function mousedown(event) {
 			// 	}
 			// }
 		} else {
-			if (selectedTab == 2 && !_keysDown[32]) {
+			if (selectedTab == 2 && !_keysDown[keyMappings.jump]) {
 				if (tool != 4) {
 					setUndo();
 				}
@@ -7954,8 +8170,74 @@ function mouseup(event) {
 	}
 }
 
+// in the case that you try to remap a key to one already in use, say no
+function compareOtherKeys(code, isGrabExtra) {
+	document.getElementById('TEMP').textContent = (code == keyMappings.jump) ? 'true' : 'false';
+	if (code == keyMappings.jump) return true;
+	else if (code == keyMappings.switch) return true;
+	else if (code == keyMappings.reset) return true;
+	else if (code == keyMappings.left) return true;
+	else if (code == keyMappings.right) return true;
+	else if (code == keyMappings.grab && !isGrabExtra) return true;
+	else if (code == keyMappings.drop) return true;
+	else if (code == keyMappings.talk) return true;
+	else if (code == keyMappings.grabExtra) return true;
+	return false;
+}
+
 function keydown(event) {
 	_keysDown[event.keyCode || event.charCode] = true;
+
+	// If we are currently remapping a key in the layout editor, capture the pressed key
+	// and update the mapping for that action. Prevent further handling by returning early.
+	if (keyRemapListeningIndex !== null) {
+		const code = event.keyCode || event.which || event.charCode;
+		if (typeof code !== 'undefined' && !isNaN(code)) {
+			switch (keyRemapListeningIndex) {
+				case 0:
+					if (compareOtherKeys(code, false)) break;
+					keyMappings.jump = code;
+					break;
+				case 1:
+					if (compareOtherKeys(code, false)) break;
+					keyMappings.switch = code;
+					break;
+				case 2:
+					if (compareOtherKeys(code, false)) break;
+					keyMappings.reset = code;
+					break;
+				case 3:
+					if (compareOtherKeys(code, false)) break;
+					keyMappings.left = code;
+					break;
+				case 4:
+					if (compareOtherKeys(code, false)) break;
+					keyMappings.right = code;
+					break;
+				case 5:
+					if (compareOtherKeys(code, false)) break;
+					keyMappings.grab = code;
+					break;
+				case 6:
+					if (compareOtherKeys(code, false)) break;
+					keyMappings.drop = code;
+					break;
+				case 7:
+					if (compareOtherKeys(code, false)) break;
+					keyMappings.talk = code;
+					break;
+				case 8:
+					if (compareOtherKeys(code, true)) break;
+					keyMappings.grabExtra = code;
+					break;
+			}
+			bfdia5b.setItem('timerMod.keyMappings', JSON.stringify(keyMappings));
+		}
+		keyRemapListeningIndex = null;
+		// stop further handling of this key press while remapping
+		event.preventDefault?.();
+		return;
+	}
 
 	if (editingTextBox && event.key) {
 		if (currentTextBoxAllowsLineBreaks && event.key == 'v' && (event.metaKey || event.ctrlKey)) {
@@ -8359,7 +8641,7 @@ function draw() {
 			// document.getElementById('TEMP').textContent = wipeTimer;
 
 			if (cutScene == 1 || cutScene == 2) {
-				if (_keysDown[13] || _keysDown[16]) {
+				if (_keysDown[keyMappings.talk]) {
 					if (!csPress && cutScene == 1) {
 						cutSceneLine++;
 						if (cutSceneLine >= cLevelDialogueChar.length) endCutScene();
@@ -8375,26 +8657,27 @@ function draw() {
 					if (recover) {
 						char[control].justChanged = 2;
 						if (recoverTimer == 0) {
-							if (_keysDown[37]) {
+							if (_keysDown[keyMappings.left]) {
 								if (!leftPress) recoverCycle(HPRC2, -1);
 								leftPress = true;
 							} else leftPress = false;
-							if (_keysDown[39]) {
+							if (_keysDown[keyMappings.right]) {
 								if (!rightPress) recoverCycle(HPRC2, 1);
 								rightPress = true;
 							} else rightPress = false;
 						}
 					} else {
 						if (cornerHangTimer == 0) {
-							if (_keysDown[37]) {
+							if (_keysDown[keyMappings.left]) {
 								char[control].moveHorizontal(-power);
-							} else if (_keysDown[39]) {
+							} else if (_keysDown[keyMappings.right]) {
 								char[control].moveHorizontal(power);
 							}
 						}
-						if (!_keysDown[37] && !_keysDown[39]) char[control].stopMoving();
+						if (!_keysDown[keyMappings.left] && !_keysDown[keyMappings.right]) char[control].stopMoving();
 					}
-					if (_keysDown[38]) {
+					// maintaining typical OS functionality; you can press either grab key to grab
+					if ((_keysDown[keyMappings.grab] || _keysDown[keyMappings.grabExtra])) {
 						if (!upPress) {
 							if (recover && recoverTimer == 0) {
 								recoverTimer = 60;
@@ -8449,7 +8732,7 @@ function draw() {
 						}
 						upPress = true;
 					} else upPress = false;
-					if (_keysDown[40]) {
+					if (_keysDown[keyMappings.drop]) {
 						if (!downPress) {
 							if (char[control].carry) putDown(control);
 							else if (recover) {
@@ -8473,14 +8756,14 @@ function draw() {
 						}
 						downPress = true;
 					} else downPress = false;
-					if (_keysDown[90]) {
+					if (_keysDown[keyMappings.switch]) {
 						if (!qPress && !recover) {
 							changeControl();
 							qTimer = 6;
 						}
 						qPress = true;
 					} else qPress = false;
-					if (_keysDown[32]) {
+					if (_keysDown[keyMappings.jump]) {
 						if (
 							(char[control].onob || char[control].submerged == 3) &&
 							char[control].landTimer > 2 &&
@@ -8495,7 +8778,7 @@ function draw() {
 				}
 			}
 
-			if (_keysDown[82] && wipeTimer == 0) {
+			if (_keysDown[keyMappings.reset] && wipeTimer == 0) {
 				// if specified fast restarts, set wipeTimer already to 29
 				wipeTimer = (fastRestart) ? 29 : 1;
 				transitionType = 0;
@@ -9881,7 +10164,7 @@ function draw() {
 				}
 			}
 
-			if (mouseIsDown && _keysDown[32]) {
+			if (mouseIsDown && _keysDown[keyMappings.jump]) {
 				lcPan[0] += _xmouse - _pxmouse;
 				lcPan[1] += _ymouse - _pymouse;
 				updateLCtiles();
@@ -9928,7 +10211,7 @@ function draw() {
 			}
 			x = Math.floor((shiftedXMouse - (330 - (scale * levelWidth) / 2)) / scale);
 			y = Math.floor((shiftedYMouse - (240 - (scale * levelHeight) / 2)) / scale);
-			if (mouseIsDown && !_keysDown[32]) {
+			if (mouseIsDown && !_keysDown[keyMappings.jump]) {
 				if (selectedTab == 2) {
 					if (tool <= 1 && mouseOnGrid()) {
 						if (tool == 1) i = 0;
@@ -10823,8 +11106,7 @@ function draw() {
 			levelTimerX, levelTimerY, levelTimerScale, levelTimerAlpha
 		);
 		redrawLevelKeys(
-			[ 'z', 'r', '', '↑', '←', '↓', '→', '⏎' ],
-			levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha
+			getKeyMapNames(), levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha
 		);
 		drawLevelButtons();
 		if (menuScreen != 3) {
@@ -10937,11 +11219,9 @@ function toggleSpeedrunPracticeMode() {
 	if (!speedrunPracticeMode) {
 		levelHasBeenSaved = false;
 
-		// briefly reenable speedrun practice mode like a mutex to reset this stuff
-		speedrunPracticeMode = true;
 		if (fastRestart) toggleFastRestart();
 		setFps(60);
-		speedrunPracticeMode = false;
+		if (stayInLevel) toggleStayInLevel();
 
 		for (let i = 0; i < speedrunPracticeBtns.length; i++) {
 			const btn = speedrunPracticeBtns[i];
@@ -11033,7 +11313,6 @@ function loadState() {
 	advanceFrame();
 
 	resetSessionTimer();
-	document.getElementById('TEMP').textContent = char[i].charState;
 }
 
 // Explore API Stuff
