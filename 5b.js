@@ -3348,6 +3348,13 @@ function drawLevelButtons() {
 	else ctx.fillText(currentLevelDisplayName, 12.85, 495.45);
 	drawMenu2_3Button(0, 837.5, 486.95, playMode == 3 ? exitExploreLevel : playMode == 2 ? exitTestLevel : menu3Menu);
 }
+
+let stayInLevel = false; // this function only used for speedrun mod button to stay in level after completing it
+let levelBeat = false; // also just for speedrun mod
+let stayTimerActive = false; // true when stopTimerButStay() has stopped the session timer but we're staying in-level
+let freezeLevelTimer = false; // explicitly freeze levelTimer increments when true
+// When a level finishes we set a pendingResetAction so reset/exit is delayed until the wipe animation completes
+let pendingResetAction = null;
 function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha = 0.6) {
 	if (bfdia5b.getItem('timerMod.showTimer') == '0') return;
 	ctx.fillStyle = '#ffffff';
@@ -3358,7 +3365,27 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 	ctx.fillText('Timer:', x, y);
 	ctx.fillText('Best:', x, y + 34 * scale);
 	ctx.fillText('Total:', x, y + 34 * 2 * scale);
-	ctx.fillText(timer, x + 80 * scale, y);
+
+	// Speedrun mod: if the level-timer is frozen (freezeLevelTimer), capture the frozen value once and keep showing that static value
+	let displayTimerStr = timer;
+	const frozen = !!freezeLevelTimer || bfdia5b.getItem('timerMod.levelTimerFrozen') == '1';
+
+	if (frozen) {
+		if (typeof redrawTimerTexts._frozenTimerMs === 'undefined') {
+			// Capture the current frame-based level time (ms) at the moment of freeze
+			redrawTimerTexts._frozenTimerMs = getTimer() - levelTimer2;
+		}
+		if (redrawTimerTexts._frozenTimerMs !== null && !isNaN(redrawTimerTexts._frozenTimerMs)) {
+			displayTimerStr = toHMS(redrawTimerTexts._frozenTimerMs);
+		}
+	} else {
+		// Not frozen — clear any cached frozen value
+		redrawTimerTexts._frozenTimerMs = undefined;
+	}
+
+	// Color the primary timer green if stay-timer active, otherwise white
+	ctx.fillStyle = stayTimerActive ? '#44FF44' : '#ffffff';
+	ctx.fillText(displayTimerStr, x + 80 * scale, y);
 
 	// Draw best/total in default (white) color
 	ctx.fillStyle = '#ffffff';
@@ -3592,6 +3619,7 @@ function playLevel(i) {
 }
 
 function resetLevel() {
+	document.getElementById('TEMP').textContent = 'Resetting level';
 	// when resetting/entering a level, clear any stay/beat/freeze state
 	levelBeat = false;
 	stayTimerActive = false;
@@ -8189,11 +8217,6 @@ function setup() {
 	}
 }
 
-let stayInLevel = false; // this function only used for speedrun mod button to stay in level after completing it
-let levelBeat = false; // also just for speedrun mod
-let stayTimerActive = false; // true when stopTimerButStay() has stopped the session timer but we're staying in-level
-let freezeLevelTimer = false; // explicitly freeze levelTimer increments when true
-
 function draw() {
 	onButton = false;
 	hoverText = '';
@@ -8226,16 +8249,19 @@ function draw() {
 		case 3:
 			ctx.drawImage(osc4, -Math.floor(-cameraX + shakeX) + Math.floor( (-cameraX+shakeX)/3), -Math.floor(-cameraY + shakeY) + Math.floor( Math.max( -cameraY/3 - ((bgXScale>bgYScale)?Math.max(0,(bgXScale*5.4-540)/2):0), 540 - osc4.height / pixelRatio) + shakeY/3), osc4.width / pixelRatio, osc4.height / pixelRatio);
 			drawLevel(ctx);
+			
+			if (wipeTimer == 30 && menuScreen != 4 && charsAtEnd >= charCount2) levelBeat = true;
 
-			if (wipeTimer == 30) levelBeat = true;
-
-			if (levelBeat && !stayInLevel) {
+			if (wipeTimer == 30) {
+				document.getElementById('TEMP').textContent = 'Resetting level';
 				if (transitionType == 0) {
 					// resetting preexisting level
 					// timer mod: took this OUT of quirks mode
 					timer += getTimer() - levelTimer2;
 					resetLevel();
-				} else if (charsAtEnd >= charCount2) {
+				} 
+
+				if (charsAtEnd >= charCount2) {
 					// beat the level!
 					if (playMode != 2 && gotThisCoin && !gotCoin[currentLevel]) {
 						gotCoin[currentLevel] = true;
@@ -8246,76 +8272,79 @@ function draw() {
 					best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimer() - levelTimer2).toFixed(0));
 					prev[currentLevel] = (getTimer() - levelTimer2).toFixed(0);
 					// Compute split based on session timer: sessionNow - sessionTimerLastEntry
-					try {
-						const sessionNow = getSessionTimerMs();
-						let elapsedMs = null;
-						if (sessionTimerLastEntry != null) {
-							elapsedMs = Math.round(sessionNow - sessionTimerLastEntry);
-						} else {
-							// fallback to previous timing if sessionTimerLastEntry wasn't set
-							elapsedMs = parseInt((getTimer() - levelTimer2).toFixed(0), 10);
-						}
-						if (sessionSplitTimes[currentLevel] == null) {
-							sessionSplitTimes[currentLevel] = elapsedMs;
-						}
-						// Track cumulative time at this level completion
-						if (sessionCumulTimes[currentLevel] == null) {
-							sessionCumulTimes[currentLevel] = sessionNow;
-						}
-						// Track entry time (wallclock when this level was completed) at this level
-						if (sessionEntryTimes[currentLevel] == null) {
-							sessionEntryTimes[currentLevel] = performance.now();
-						}
-						updateSplitTime(currentLevel);
-						// update sessionTimerLastEntry so the next split measures from this point
-						sessionTimerLastEntry = sessionNow;
-						try { document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry; } catch (e) {}
-						
-						// Stop session timer when level 52 is completed (last level in run - 1)
-						if (currentLevel === 51) {
-							stopSessionTimer();
-						}
-						
-						// Auto-scroll livesplit entries one entry to the right so the newly-completed
-						// split becomes visible. This is guarded so it won't throw if the DOM
-						// element doesn't exist (e.g., running without the UI present).
-						try {
-							const container = document.getElementById('livesplit-entries');
-							if (container) {
-								const firstEntry = container.querySelector('.livesplit-entry');
-								if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
-									const style = window.getComputedStyle(firstEntry);
-									const marginRight = parseFloat(style.marginRight) || 0;
-									
-									// const amount = Math.round(firstEntry.getBoundingClientRect().width + marginRight);
-									const amount = Math.round(firstEntry.getBoundingClientRect().width + 4.1);
-									if (typeof container.scrollBy === 'function') {
-										container.scrollBy({ left: amount, behavior: 'smooth' });
-									} else {
-										container.scrollLeft += amount;
-									}
-								}
+					const sessionNow = getSessionTimerMs();
+					let elapsedMs = null;
+					if (sessionTimerLastEntry != null) {
+						elapsedMs = Math.round(sessionNow - sessionTimerLastEntry);
+					} else {
+						// fallback to previous timing if sessionTimerLastEntry wasn't set
+						elapsedMs = parseInt((getTimer() - levelTimer2).toFixed(0), 10);
+					}
+					if (sessionSplitTimes[currentLevel] == null) {
+						sessionSplitTimes[currentLevel] = elapsedMs;
+					}
+					// Track cumulative time at this level completion
+					if (sessionCumulTimes[currentLevel] == null) {
+						sessionCumulTimes[currentLevel] = sessionNow;
+					}
+					// Track entry time (wallclock when this level was completed) at this level
+					if (sessionEntryTimes[currentLevel] == null) {
+						sessionEntryTimes[currentLevel] = performance.now();
+					}
+					updateSplitTime(currentLevel);
+					// update sessionTimerLastEntry so the next split measures from this point
+					sessionTimerLastEntry = sessionNow;
+					try { document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry; } catch (e) {}
+					
+					// Stop session timer when level 52 is completed (last level in run - 1)
+					if (currentLevel === 51) {
+						stopSessionTimer();
+					}
+					
+					// Auto-scroll livesplit entries one entry to the right so the newly-completed
+					// split becomes visible. This is guarded so it won't throw if the DOM
+					// element doesn't exist (e.g., running without the UI present).
+					const container = document.getElementById('livesplit-entries');
+					if (container) {
+						const firstEntry = container.querySelector('.livesplit-entry');
+						if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
+							const style = window.getComputedStyle(firstEntry);
+							const marginRight = parseFloat(style.marginRight) || 0;
+							
+							// const amount = Math.round(firstEntry.getBoundingClientRect().width + marginRight);
+							const amount = Math.round(firstEntry.getBoundingClientRect().width + 4.1);
+							if (typeof container.scrollBy === 'function') {
+								container.scrollBy({ left: amount, behavior: 'smooth' });
+							} else {
+								container.scrollLeft += amount;
 							}
-						} catch (e) {}
-					} catch (e) {}
-					if (playMode == 0) {
+						}
+					}
+
+					if (!freezeLevelTimer) {
+						timer += getTimer() - levelTimer2;
+						best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimer() - levelTimer2).toFixed(0));
+						prev[currentLevel] = (getTimer() - levelTimer2).toFixed(0);
+					}
+
+					if (playMode == 0 && !stayInLevel) {
 						currentLevel++;
 						if (!quirksMode) toSeeCS = true; // This line was absent in the original source, but without it dialogue doesn't play after level 1 when on a normal playthrough.
 						levelProgress = currentLevel;
 						// disable savestates so game doesn't crash when it tries to savestate
 						levelHasBeenSaved = false;
+
 						if (currentLevel < levelCount) resetLevel();
 						else exitLevel();
-					} else {
+					}
+					else if (!stayInLevel) {
 						if (playMode == 3) {
 							exitExploreLevel();
 						} else if (playMode == 2) {
 							exitTestLevel();
 						} else {
+							freeze = true;
 							exitLevel();
-							// if (currentLevel > 99) {
-							// 	bonusesCleared[currentLevel - 100] = true;
-							// }
 						}
 					}
 					saveGame();
@@ -8323,8 +8352,11 @@ function draw() {
 			}
 			else if (stayInLevel && levelBeat) {
 				stopTimerButStay();
+				if (transitionType == 0) {
+					resetLevel();
+				}
 			}
-			document.getElementById('TEMP').textContent = levelTimer;
+			// document.getElementById('TEMP').textContent = wipeTimer;
 
 			if (cutScene == 1 || cutScene == 2) {
 				if (_keysDown[13] || _keysDown[16]) {
