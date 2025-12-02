@@ -1,0 +1,43 @@
+THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
+
+PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
+1) Fix Livesplit behavior of not loading best time after reset
+2) Improve overall performance (this mod is significantly laggier than the original timermod)
+3) Make a vertical Livesplit layout
+4) Add delta to Livesplit level entries
+5) Fix stay-after-finish positions resetting before wipe
+?) Got any more ideas? DM me on Discord!: @korzenten
+
+12/01/25:
+-Implemented the ability to remap keys from the level select screen. Fully functional but does not support remapping hotkeys used specifically by the speedrun mod itself. Also includes the ability to remap an additional key to the grab/throw input, which is currently allowed in the speedrun rules. Mapping multiple actions to the same input is blocked unless the two keys happen to be the two grab/throw keys.
+-Also made the background for the "CHANGE LAYOUT", as well as the loading screen, to be blue instead of the hideous barf color (seriously, Cary, could you pick a worse color?). Also made the "stay after finish" button turn off after turning Speedrun Practice Mode off.
+-Made this changelog! How meta!
+
+11/30/25:
+-Implemented most of the "Stay After Finish" feature, which allows the player to stay in a level after completing it if they click the "Stay After Fiish" button. This is useful as it allows them to see their completion time while still being in the level to make resetting for more individual level attempts more efficient. This can be toggled using a button in the same row as all other speedrun mod features. But it isn't perfect; after a level completion and a reset, the characters' positions are updated before the wipe completes, which is a bug, but it doesn't actually hinder gameplay as their positions reset again following the wipe. It also isn't even visible if fast reset is turned on. This feature IS allowed in official speedruns.
+
+11/27/25: Fixed the lever positions not updating when loading to a savestate. Made the speedrun mod buttons look a little bit less ugly.
+
+11/26/25: 
+-Implemented the ability to savestate. This allows you to save your current position using the "Save State" button (or W on the keyboard) and then load it in while you're still in the level using the "Load State" button (or E on the keyboard), making it easier to practice a specific part of that level. This feature is NOT allowed in official speedruns.
+-Implemented a frame-advance tool; this allows the player to increment the game by one frame at a time, thus giving them the maximum control over their movement possible. Useful for very precise tricks that require even more precision that slowing down the game. This feature is NOT allowed in official speedruns.
+-Added a "Fast Restart" button. This feature allows the player to restart a level instantly without having to wait for the wipe transition. This makes grinds involving many level restarts much more efficient. This feature is ONLY allowed in offical individual level speedruns.
+-Added a "Speedrun Practice Mode" toggle. "Speedrun Practice Mode" is any feature that isn't allowed in full-game speedruns but is allowed for practicing, as well as official individual level speedruns in some cases. Toggling this feature off will automatically set all practice mode features to be off and disables them from being turned back on until after the mode is toggled back on. This feature is useful for those who don't want to accidentally use a tool that might be banned in a full-game speedrun, and having it turned on will make runs of any kind easier to moderate.
+
+11/24/25:
+-Fixed a bug where the variable that scrolls the livesplit splits wasn't reduced after the timer size was reduced.
+
+11/23/25:
+-Implemented a slider that changes the framerate of the game to a variety of positions lower than that of the base game. This is useful for practicing difficult tricks at a lower speed. The slider can be activated using both the mouse or with the keys 1-9 and 0 on the keyboard. This feature is NOT allowed in official speedruns.
+-Added a pause button toggle. This button ("Play/Pause"), like the slider, modifies the frame rate, but it sets it to 0, effectively pausing the game. Click it again (or use G on the keyboard) and it turns back on. This gives the player even more control over their movement. This feature is NOT allowed in official speedruns.
+-Shrunk the Livesplit timer and splits to be the width of the game window rather than the width of the browser window.
+
+11/21/25:
+-Fixed the Livesplit timer not stopping after level 52 (that was a change while testing).
+
+11/17/25:
+-Implemented the Livesplit timer. The timer automatically starts counting up upon entering Level 1 after a new game, and it automatically stops after level 52 is completed. Additionally, it also has splits that track the level's completion time and the run's running total for every level, and those automatically split as well. It also should have a memory of the best run so that you can compare to it while running, but that doesn't work yet as it still only shows the times of the previous run to make it that far for that split.
+
+11/16/25:
+-Forked imaperson's repo!
+-Added buttons that modify the levelProgress value. A player can choose "53" to unlock every level and practice whichever they would like, even if they have not beaten every level yet. They can also select "19" and "42" to start running a Match/Ice Cube segment speedrun without having to beat every level up to there from a new game or by modifying the levelProgress value using devtools. Additionally, there are "+" and "-" buttons the player can use to have finer control over where a large-segment practice run starts (there aren't any official speedrun categories for these runs though).
