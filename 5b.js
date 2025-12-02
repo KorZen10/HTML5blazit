@@ -11208,7 +11208,7 @@ function toggleFastRestart() {
 	fastRestart = !fastRestart;
 	document.getElementById('fast-restart-btn').textContent = (fastRestart) ? 'Disable fast restart' : 'Enable fast restart';
 }
-
+ 
 function toggleStayInLevel() {
 	stayInLevel = !stayInLevel;
 	document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave level after finish' : 'Stay in level after finish';
