@@ -141,6 +141,14 @@ p{
 	font-variant-numeric: tabular-nums;
 	text-align: right;
 }
+.entry-delta {
+	font-size: 10px;
+	font-weight: bold;
+	color: #999;
+	font-variant-numeric: tabular-nums;
+	text-align: center;
+	min-width: 70px;
+}
 #livesplit-timer {
 	display: flex;
 	flex-direction: column;

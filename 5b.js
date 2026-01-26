@@ -108,10 +108,13 @@ let sessionSplitTimes = new Array(levelCount).fill(null);
 let sessionCumulTimes = new Array(levelCount).fill(null);
 // Track entry times (wallclock performance.now() when level was completed) for current run
 let sessionEntryTimes = new Array(levelCount).fill(null);
+// Current run deltas: difference between current split and fastest split (not stored in localStorage)
+let currentRunDeltas = new Array(levelCount).fill(null);
 // Best run tracking: stores the fastest total time and its cumulative times per level
 let fastestRunTime = null; // fastest total sessionTimerAccum when run completed
 let fastestRunCumulTimes = new Array(levelCount).fill(null); // cumulative times from fastest run
 let fastestRunEntryTimes = new Array(levelCount).fill(null); // entry times (wallclock) from fastest run
+let bestIndividualSplits = new Array(levelCount).fill(null); // best individual split times for each level
 let coins;
 let longMode = false;
 let quirksMode = true;
@@ -169,8 +172,12 @@ function keyCodeToLabel(code) {
 
 // Generate keyMapNames array dynamically from current keyMappings
 // Order: [jump, switch, reset, [empty], grab, left, drop, right, talk, grabExtra]
+// (The cached keymap name is just to help with efficiency)
+let cachedKeyMapNames = null;
 function getKeyMapNames() {
-	return [
+	if (cachedKeyMapNames) return cachedKeyMapNames;
+	
+	const result = [
 		keyCodeToSymbol(keyMappings.jump),
 		keyCodeToSymbol(keyMappings.switch),
 		keyCodeToSymbol(keyMappings.reset),
@@ -182,6 +189,8 @@ function getKeyMapNames() {
 		keyCodeToSymbol(keyMappings.talk),
 		keyCodeToSymbol(keyMappings.grabExtra),
 	];
+	cachedKeyMapNames = result;
+	return result;
 }
 
 let levelAlreadySharedToExplore = false;
@@ -231,7 +240,7 @@ function saveGame() {
 	bfdia5b.setItem('deathCount', deathCount);
 	bfdia5b.setItem('timer', timer);
 	// Save fastest run data
-	saveFastestRun();
+	// saveFastestRun();
 }
 
 function getSavedGame() {
@@ -266,11 +275,19 @@ getSavedGame();
 getSavedSettings();
 
 function saveFastestRun() {
-	if (fastestRunTime !== null) {
-		bfdia5b.setItem('fastestRunTime', fastestRunTime.toString());
-		bfdia5b.setItem('fastestRunCumulTimes', fastestRunCumulTimes.map(t => t === null ? 'null' : t.toString()).join(','));
-		bfdia5b.setItem('fastestRunEntryTimes', fastestRunEntryTimes.map(t => t === null ? 'null' : t.toString()).join(','));
-	}
+	console.log("saveFastestRun entered");
+
+	console.log("sessionSplitTimes:", sessionSplitTimes)
+	console.log("sessionCumulTimes:", sessionCumulTimes)
+	console.log("sessionEntryTimes:", sessionEntryTimes)
+
+	bfdia5b.setItem('fastestRunTime', fastestRunTime.toString());
+	bfdia5b.setItem('fastestRunCumulTimes', fastestRunCumulTimes.map(t => t === null ? 'null' : t.toString()).join(','));
+	bfdia5b.setItem('fastestRunEntryTimes', fastestRunEntryTimes.map(t => t === null ? 'null' : t.toString()).join(','));
+}
+
+function saveBestIndividualSplits() {
+	bfdia5b.setItem('bestIndividualSplits', bestIndividualSplits.map(t => t === null ? 'null' : t.toString()).join(','));
 }
 
 function loadFastestRun() {
@@ -287,6 +304,10 @@ function loadFastestRun() {
 		const savedEntryTimes = bfdia5b.getItem('fastestRunEntryTimes');
 		if (savedEntryTimes) {
 			fastestRunEntryTimes = savedEntryTimes.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
+		}
+		const savedBestIndividual = bfdia5b.getItem('bestIndividualSplits');
+		if (savedBestIndividual) {
+			bestIndividualSplits = savedBestIndividual.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
 		}
 	}
 }
@@ -387,6 +408,7 @@ function getSavedLevelpackProgress() {
 }
 getSavedLevelpackProgress();
 
+getTimerCached = null; // this variable prevents us from having to call getTimer() multiple times per frame
 function getTimer() {
 	return _frameCount / 0.06;
 }
@@ -2289,11 +2311,11 @@ function startSessionTimer() {
 function stopSessionTimer() {
 	if (sessionTimerRunning) {
 		sessionTimerAccum += performance.now() - sessionTimerStartWallTime;
-		sessionTimerStartWallTime = null;
 		sessionTimerRunning = false;
 	}
 	// Compare current run time to fastest run and update if faster
 	compareFastestRun();
+	sessionTimerStartWallTime = null;
 }
 
 function compareFastestRun() {
@@ -2304,66 +2326,134 @@ function compareFastestRun() {
 		// New fastest run!
 		fastestRunTime = sessionTimerAccum;
 		fastestRunCumulTimes = [...sessionCumulTimes]; // Copy current session cumulative times
-		fastestRunEntryTimes = [...sessionEntryTimes]; // Copy current session entry times
+		fastestRunEntryTimes = sessionCumulTimes.map((cumul, i) => {
+			if (cumul == null) return null;
+			if (i === 0) return cumul;
+			const prev = sessionCumulTimes[i-1];
+			if (prev == null) return null;
+			return cumul - prev;
+		}); // Calculate split durations
 		saveFastestRun();
-		console.log(`New fastest run! Time: ${toMMSSms(fastestRunTime)}`);
 	}
 }
 
 function resetSessionTimer() {
+	// Update best individual splits for all levels in this run before clearing
+	let hasNew = false;
+	let improvedLevels = [];
+	for (let levelId = 0; levelId < levelCount; levelId++) {
+		if (sessionSplitTimes[levelId] !== null) {
+			if (bestIndividualSplits[levelId] === null) {
+				bestIndividualSplits[levelId] = sessionSplitTimes[levelId];
+				hasNew = true;
+			} else if (sessionSplitTimes[levelId] < bestIndividualSplits[levelId]) {
+				improvedLevels.push(levelId);
+			}
+		}
+	}
+	if (hasNew) saveBestIndividualSplits();
+	if (improvedLevels.length > 0) {
+		const update = confirm(`Improved best splits for level${improvedLevels.length > 1 ? 's' : ''} ${improvedLevels.map(i => i + 1).join(', ')}! Update?`);
+		if (update) {
+			for (const levelId of improvedLevels) {
+				bestIndividualSplits[levelId] = sessionSplitTimes[levelId];
+			}
+			saveBestIndividualSplits();
+		}
+	}
+	
 	sessionTimerAccum = 0;
 	sessionTimerStartWallTime = null;
 	sessionTimerRunning = false;
-	try { updateSessionTimerDisplay(); } catch (e) {}
+	// Clear session arrays so that updateSplitTime falls back to fastest run data
+	sessionSplitTimes.fill(null);
+	sessionCumulTimes.fill(null);
+	sessionEntryTimes.fill(null);
+	sessionTimerLastEntry = null;
+	updateSessionTimerDisplay();
 	// Update all livesplit entries to show fastest run times when a new run starts
+	updateAllLivesplitEntries();
+}
+
+function clearFastestRun() {
+	localStorage.removeItem('fastestRunTime');
+	localStorage.removeItem('fastestRunCumulTimes');
+	localStorage.removeItem('fastestRunEntryTimes');
+	localStorage.removeItem('bestIndividualSplits');
+	fastestRunTime = null;
+	fastestRunCumulTimes.fill(null);
+	fastestRunEntryTimes.fill(null);
+	bestIndividualSplits.fill(null);
 	updateAllLivesplitEntries();
 }
 
 function updateSplitTime(levelId) {
 	// Update the corresponding split entry in the DOM using stored `prev`/`best` values.
-	try {
-		const el = document.getElementById('split-time-' + levelId);
-		if (!el) return;
-		// Prefer the session-run split (the duration between entering and exiting the level)
-		let value = null;
+	const el = document.getElementById('split-time-' + levelId);
+	// Prefer the session-run split (the duration between entering and exiting the level)
+	let value = null;
+	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
+		value = sessionSplitTimes[levelId];
+		document.getElementById('TEMP').textContent = "sessionSplitTimes:", sessionSplitTimes;
+	} else {
+		// Prefer explicit split (entry) times from the fastest run saved in storage.
+		// If not loaded into memory yet, try loading it.
+		if (typeof fastestRunEntryTimes === 'undefined' || (Array.isArray(fastestRunEntryTimes) && fastestRunEntryTimes.every(v => v == null))) {
+			loadFastestRun();
+		}
+		if (typeof fastestRunEntryTimes !== 'undefined' && fastestRunEntryTimes[levelId] != null) {
+			value = fastestRunEntryTimes[levelId];
+		} else if (typeof prev !== 'undefined' && prev[levelId] != undefined && prev[levelId] !== 'NaN') {
+			value = parseInt(prev[levelId], 10);
+		} else if (typeof best !== 'undefined' && best[levelId] != undefined && best[levelId] !== 'NaN') {
+			value = parseInt(best[levelId], 10);
+		}
+	}
+	if (value != null && !isNaN(value)) {
+		el.textContent = toMMSSms(value);
+	} else {
+		el.textContent = '\u2014'; // em dash for no time
+	}
+	
+	// Update cumulative time on the right side
+	const cumulEl = document.getElementById('split-cumul-time-' + levelId);
+	if (cumulEl) {
+		// Prefer current session cumulative time if we have an active split
 		if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
-			value = sessionSplitTimes[levelId];
+			const sessionNow = getSessionTimerMs();
+			cumulEl.textContent = sessionNow > 0 ? toMMSSms(sessionNow) : '\u2014';
+		} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[levelId] != null && fastestRunCumulTimes[levelId] > 0) {
+			// Otherwise show fastest run cumulative time (only if it's valid)
+			cumulEl.textContent = toMMSSms(fastestRunCumulTimes[levelId]);
 		} else {
-			// Prefer explicit split (entry) times from the fastest run saved in storage.
-			// If not loaded into memory yet, try loading it.
-			if (typeof fastestRunEntryTimes === 'undefined' || (Array.isArray(fastestRunEntryTimes) && fastestRunEntryTimes.every(v => v == null))) {
-				try { loadFastestRun(); } catch (e) {}
-			}
-			if (typeof fastestRunEntryTimes !== 'undefined' && fastestRunEntryTimes[levelId] != null) {
-				value = fastestRunEntryTimes[levelId];
-			} else if (typeof prev !== 'undefined' && prev[levelId] != undefined && prev[levelId] !== 'NaN') {
-				value = parseInt(prev[levelId], 10);
-			} else if (typeof best !== 'undefined' && best[levelId] != undefined && best[levelId] !== 'NaN') {
-				value = parseInt(best[levelId], 10);
-			}
+			cumulEl.textContent = '\u2014';
 		}
-		if (value != null && !isNaN(value)) {
-			el.textContent = toMMSSms(value);
-		} else {
-			el.textContent = '\u2014'; // em dash for no time
+	}
+	
+	// Update delta between current run and fastest run
+	const deltaEl = document.getElementById('split-delta-' + levelId);
+	if (deltaEl) {
+		let delta = null;
+		if (sessionCumulTimes[levelId] != null && fastestRunCumulTimes[levelId] != null) {
+			delta = sessionCumulTimes[levelId] - fastestRunCumulTimes[levelId];
 		}
-		
-		// Update cumulative time on the right side
-		const cumulEl = document.getElementById('split-cumul-time-' + levelId);
-		if (cumulEl) {
-			// Prefer current session cumulative time if we have an active split
-			if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
-				const sessionNow = getSessionTimerMs();
-				cumulEl.textContent = sessionNow > 0 ? toMMSSms(sessionNow) : '\u2014';
-			} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[levelId] != null && fastestRunCumulTimes[levelId] > 0) {
-				// Otherwise show fastest run cumulative time (only if it's valid)
-				cumulEl.textContent = toMMSSms(fastestRunCumulTimes[levelId]);
+		if (delta != null) {
+			const sign = delta >= 0 ? '+' : '-';
+			deltaEl.textContent = sign + toMMSSms(Math.abs(delta));
+
+			console.log("sessionSplitTimes[levelId]",sessionSplitTimes[levelId])
+			console.log("bestIndividualSplits[levelId]",bestIndividualSplits[levelId])
+
+			// Color gold if this split is the best individual, else red/green
+			if (sessionSplitTimes[levelId] < bestIndividualSplits[levelId]) {
+				deltaEl.style.color = 'gold';
 			} else {
-				cumulEl.textContent = '\u2014';
+				deltaEl.style.color = delta > 0 ? 'red' : '#00FF00';
 			}
+		} else {
+			deltaEl.textContent = '';
+			deltaEl.style.color = '#999'; // default color
 		}
-	} catch (e) {
-		// DOM might not be ready; ignore silently
 	}
 }
 
@@ -2386,7 +2476,6 @@ function applyFastestRunToSession() {
 		loadFastestRun();
 	}
 	updateAllLivesplitEntries();
-	console.log('Applied fastest run to session splits');
 }
 
 function createResetSplitsButton() {
@@ -2627,6 +2716,7 @@ async function loadingScreen() {
 }
 
 window.onload = function () {
+	initTimerKeysCache();
 	loadingScreen();
 };
 
@@ -2998,7 +3088,7 @@ function menu2Back() {
 }
 
 function menu3Menu() {
-	timer += getTimer() - levelTimer2;
+	timer += getTimerCached - levelTimer2;
 	saveGame();
 	exitLevel();
 }
@@ -3011,16 +3101,17 @@ function menu8Menu() {
 
 function beginNewGame() {
 	// Reset session timer and per-run split state
-	resetSessionTimer();
 	setFps(60);
 	document.getElementById("fps-slider").value = 10;
 	if (paused) togglePause(); // if game is paused somehow, unpause it
 	sessionSplitTimes = new Array(levelCount).fill(null);
 	sessionCumulTimes = new Array(levelCount).fill(null);
 	sessionEntryTimes = new Array(levelCount).fill(null);
+	currentRunDeltas = new Array(levelCount).fill(null);
 	levelEntryTimestamps = new Array(levelCount).fill(null);
 	// Reset livesplit scroll position to the left for a new run
 	if (document.getElementById('livesplit-entries')) document.getElementById('livesplit-entries').scrollLeft = 0;
+	resetSessionTimer();
 	clearVars();
 	saveGame();
 	enterBaseLevelpackLevelSelect();
@@ -3204,8 +3295,8 @@ function drawLevelButton(text, x, y, id, color) {
 	}
 
 	if (transitionType == 2 && id == currentLevel) {
-		if (!exitedLevelTime) exitedLevelTime = getTimer();
-		else if (getTimer() - exitedLevelTime >= 500 && !mouseHover) {
+		if (!exitedLevelTime) exitedLevelTime = getTimerCached;
+		else if (getTimerCached - exitedLevelTime >= 500 && !mouseHover) {
 			exitedLevelTime = undefined;
 			transitionType = 1;
 		} else {
@@ -3460,7 +3551,7 @@ let freezeLevelTimer = false; // explicitly freeze levelTimer increments when tr
 // When a level finishes we set a pendingResetAction so reset/exit is delayed until the wipe animation completes
 let pendingResetAction = null;
 function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha = 0.6) {
-	if (bfdia5b.getItem('timerMod.showTimer') == '0') return;
+	if (cachedShowTimer == '0') return;
 	ctx.fillStyle = '#ffffff';
 	ctx.textAlign = 'left';
 	ctx.textBaseline = 'top';
@@ -3477,7 +3568,7 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 	if (frozen) {
 		if (typeof redrawTimerTexts._frozenTimerMs === 'undefined') {
 			// Capture the current frame-based level time (ms) at the moment of freeze
-			redrawTimerTexts._frozenTimerMs = getTimer() - levelTimer2;
+			redrawTimerTexts._frozenTimerMs = getTimerCached - levelTimer2;
 		}
 		if (redrawTimerTexts._frozenTimerMs !== null && !isNaN(redrawTimerTexts._frozenTimerMs)) {
 			displayTimerStr = toHMS(redrawTimerTexts._frozenTimerMs);
@@ -3503,7 +3594,11 @@ function stopTimerButStay() {
 	freezeLevelTimer = true;
 }
 // Build keyCoordinateMatrix dynamically from current keyMappings
+// (cached key matrix is just to help with efficiency)
+let cachedKeyMatrix = null;
 function getKeyCoordinateMatrix() {
+	if (cachedKeyMatrix) return cachedKeyMatrix;
+	
 	const matrix = {};
 	// Map action names to their visual coordinates
 	const coords = {
@@ -3522,10 +3617,11 @@ function getKeyCoordinateMatrix() {
 		const keyCode = keyMappings[action];
 		if (keyCode != null) matrix[keyCode] = coords[action];
 	}
+	cachedKeyMatrix = matrix;
 	return matrix;
 }
 function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
-	if (bfdia5b.getItem('timerMod.showKeys') == '0') return;
+	if (cachedShowKeys == '0') return;
 	
 	const keyCoordinateMatrix = getKeyCoordinateMatrix();
 	ctx.globalAlpha = alpha;
@@ -3567,8 +3663,16 @@ function runLayoutEditor() {
 	drawLevelButtons();
 
 	if (_keysDown[82] && keyRemapListeningIndex === null) { // don't wanna reset layout if just assigning a key
-		bfdia5b.setItem('timerMod.showTimer', 1);
-		bfdia5b.setItem('timerMod.showKeys', 1);
+		cachedShowTimer = '1';
+		cachedShowKeys = '1';
+		cachedLevelTimerPos = [6, 6];
+		cachedLevelTimerScale = 0.7;
+		cachedLevelTimerAlpha = 0.6;
+		cachedLevelKeysPos = [695, 3];
+		cachedLevelKeysScale = 0.6;
+		cachedLevelKeysAlpha = 0.45;
+		bfdia5b.setItem('timerMod.showTimer', '1');
+		bfdia5b.setItem('timerMod.showKeys', '1');
 		bfdia5b.setItem('timerMod.levelTimerPos', '6,6');
 		bfdia5b.setItem('timerMod.levelTimerScale', '0.7');
 		bfdia5b.setItem('timerMod.levelTimerAlpha', '0.6');
@@ -3608,6 +3712,9 @@ function runLayoutEditor() {
 		} else levelTimerOffset = draggingScrollbar = false;
 	}
 	redrawTimerTexts('[T to hide]', '[↑/↓ to scale]', '[←/→ opacity]', levelTimerX, levelTimerY, levelTimerScale, levelTimerAlpha * (timerHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
+	cachedLevelTimerPos = [levelTimerX, levelTimerY];
+	cachedLevelTimerScale = levelTimerScale;
+	cachedLevelTimerAlpha = levelTimerAlpha;
 	bfdia5b.setItem('timerMod.levelTimerPos', `${levelTimerX.toFixed(3)},${levelTimerY.toFixed(3)}`);
 	bfdia5b.setItem('timerMod.levelTimerScale', levelTimerScale.toFixed(2));
 	bfdia5b.setItem('timerMod.levelTimerAlpha', levelTimerAlpha.toFixed(2));
@@ -3626,6 +3733,9 @@ function runLayoutEditor() {
 		} else levelKeysOffset = draggingScrollbar = false;
 	}
 	redrawLevelKeys([ '', '', '[Y to hide]', '', '', '', '', '' ], levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha * (keysHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
+	cachedLevelKeysPos = [levelKeysX, levelKeysY];
+	cachedLevelKeysScale = levelKeysScale;
+	cachedLevelKeysAlpha = levelKeysAlpha;
 	bfdia5b.setItem('timerMod.levelKeysPos', `${levelKeysX.toFixed(3)},${levelKeysY.toFixed(3)}`);
 	bfdia5b.setItem('timerMod.levelKeysScale', levelKeysScale.toFixed(2));
 	bfdia5b.setItem('timerMod.levelKeysAlpha', levelKeysAlpha.toFixed(2));
@@ -4046,7 +4156,7 @@ function resetLevel() {
 	gotThisCoin = false;
 	levelTimer = 0;
 	recoverTimer = 0;
-	levelTimer2 = getTimer();
+	levelTimer2 = getTimerCached;
 	if (char[0].charState <= 9) changeControl();
 
 	doorLightFade = new Array(charCount2).fill(0);
@@ -8232,6 +8342,9 @@ function keydown(event) {
 					break;
 			}
 			bfdia5b.setItem('timerMod.keyMappings', JSON.stringify(keyMappings));
+			// Invalidate caches when mappings change
+			cachedKeyMatrix = null;
+			cachedKeyMapNames = null;
 		}
 		keyRemapListeningIndex = null;
 		// stop further handling of this key press while remapping
@@ -8474,7 +8587,14 @@ function setup() {
 					cumulTime.textContent = '\u2014';
 				}
 
+				// Middle: delta between current run and fastest run
+				const delta = document.createElement('div');
+				delta.className = 'entry-delta';
+				delta.id = 'split-delta-' + i;
+				delta.textContent = ''; // Initially empty
+
 				timesRow.appendChild(time);
+				timesRow.appendChild(delta);
 				timesRow.appendChild(cumulTime);
 
 				entry.appendChild(name);
@@ -8499,12 +8619,41 @@ function setup() {
 	}
 }
 
+// Cached localStorage values for timer/keys display (avoids reading storage every frame)
+let cachedShowTimer = null;
+let cachedShowKeys = null;
+let cachedLevelTimerPos = [6, 6];
+let cachedLevelTimerScale = 0.7;
+let cachedLevelTimerAlpha = 0.6;
+let cachedLevelKeysPos = [695, 3];
+let cachedLevelKeysScale = 0.6;
+let cachedLevelKeysAlpha = 0.45;
+
+// Initialize cached values from localStorage
+function initTimerKeysCache() {
+	cachedShowTimer = bfdia5b.getItem('timerMod.showTimer') || '1';
+	cachedShowKeys = bfdia5b.getItem('timerMod.showKeys') || '1';
+	const timerPos = bfdia5b.getItem('timerMod.levelTimerPos')?.split(',');
+	if (timerPos) {
+		cachedLevelTimerPos = [parseFloat(timerPos[0]) || 6, parseFloat(timerPos[1]) || 6];
+	}
+	cachedLevelTimerScale = parseFloat(bfdia5b.getItem('timerMod.levelTimerScale')) || 0.7;
+	cachedLevelTimerAlpha = parseFloat(bfdia5b.getItem('timerMod.levelTimerAlpha')) || 0.6;
+	const keysPos = bfdia5b.getItem('timerMod.levelKeysPos')?.split(',');
+	if (keysPos) {
+		cachedLevelKeysPos = [parseFloat(keysPos[0]) || 695, parseFloat(keysPos[1]) || 3];
+	}
+	cachedLevelKeysScale = parseFloat(bfdia5b.getItem('timerMod.levelKeysScale')) || 0.6;
+	cachedLevelKeysAlpha = parseFloat(bfdia5b.getItem('timerMod.levelKeysAlpha')) || 0.45;
+}
+
 function draw() {
 	onButton = false;
 	hoverText = '';
 	onTextBox = false;
 	onScrollbar = false;
 	mousePressedLastFrame = pmouseIsDown && !mouseIsDown;
+	getTimerCached = getTimer();
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	if (menuScreen == 2 || menuScreen == 3) ctx.translate(Math.floor(-cameraX + shakeX), Math.floor(-cameraY + shakeY));
 	switch (menuScreen) {
@@ -8539,7 +8688,7 @@ function draw() {
 				if (transitionType == 0) {
 					// resetting preexisting level
 					// timer mod: took this OUT of quirks mode
-					timer += getTimer() - levelTimer2;
+					// timer += getTimerCached - levelTimer2;
 					resetLevel();
 				} 
 
@@ -8550,9 +8699,9 @@ function draw() {
 						coins++;
 						// bonusProgress = Math.floor(coins * 0.33);
 					}
-					timer += getTimer() - levelTimer2;
-					best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimer() - levelTimer2).toFixed(0));
-					prev[currentLevel] = (getTimer() - levelTimer2).toFixed(0);
+					// timer += getTimerCached - levelTimer2; // Removed: timer is added below in the level end logic
+					best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimerCached - levelTimer2).toFixed(0));
+					prev[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
 					// Compute split based on session timer: sessionNow - sessionTimerLastEntry
 					const sessionNow = getSessionTimerMs();
 					let elapsedMs = null;
@@ -8560,7 +8709,7 @@ function draw() {
 						elapsedMs = Math.round(sessionNow - sessionTimerLastEntry);
 					} else {
 						// fallback to previous timing if sessionTimerLastEntry wasn't set
-						elapsedMs = parseInt((getTimer() - levelTimer2).toFixed(0), 10);
+						elapsedMs = parseInt((getTimerCached - levelTimer2).toFixed(0), 10);
 					}
 					if (sessionSplitTimes[currentLevel] == null) {
 						sessionSplitTimes[currentLevel] = elapsedMs;
@@ -8580,6 +8729,7 @@ function draw() {
 					
 					// Stop session timer when level 52 is completed (last level in run - 1)
 					if (currentLevel === 51) {
+					// if (currentLevel === 1) {
 						stopSessionTimer();
 					}
 					
@@ -8604,9 +8754,9 @@ function draw() {
 					}
 
 					if (!freezeLevelTimer) {
-						timer += getTimer() - levelTimer2;
-						best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimer() - levelTimer2).toFixed(0));
-						prev[currentLevel] = (getTimer() - levelTimer2).toFixed(0);
+						timer += getTimerCached - levelTimer2;
+						best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimerCached - levelTimer2).toFixed(0));
+						prev[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
 					}
 
 					if (playMode == 0 && !stayInLevel) {
@@ -11091,18 +11241,25 @@ function draw() {
 			drawCutScene();
 		}
 
-		var levelTimerX = parseFloat(bfdia5b.getItem('timerMod.levelTimerPos')?.split(',')[0]) || 6;
-		var levelTimerY = parseFloat(bfdia5b.getItem('timerMod.levelTimerPos')?.split(',')[1]) || 6;
-		var levelTimerScale = parseFloat(bfdia5b.getItem('timerMod.levelTimerScale')) || 0.7;
-		var levelTimerAlpha = parseFloat(bfdia5b.getItem('timerMod.levelTimerAlpha')) || 0.6;
-		var levelKeysX = parseFloat(bfdia5b.getItem('timerMod.levelKeysPos')?.split(',')[0]) || 695;
-		var levelKeysY = parseFloat(bfdia5b.getItem('timerMod.levelKeysPos')?.split(',')[1]) || 3;
-		var levelKeysScale = parseFloat(bfdia5b.getItem('timerMod.levelKeysScale')) || 0.6;
-		var levelKeysAlpha = parseFloat(bfdia5b.getItem('timerMod.levelKeysAlpha')) || 0.45;
-		if ((_keysDown[84] || (tPress = false)) && !tPress && (tPress = true)) bfdia5b.setItem('timerMod.showTimer', +!+(bfdia5b.getItem('timerMod.showTimer') || 1));
-		if ((_keysDown[89] || (yPress = false)) && !yPress && (yPress = true)) bfdia5b.setItem('timerMod.showKeys', +!+(bfdia5b.getItem('timerMod.showKeys') || 1));
+		// Use cached values instead of reading localStorage every frame
+		var levelTimerX = cachedLevelTimerPos[0];
+		var levelTimerY = cachedLevelTimerPos[1];
+		var levelTimerScale = cachedLevelTimerScale;
+		var levelTimerAlpha = cachedLevelTimerAlpha;
+		var levelKeysX = cachedLevelKeysPos[0];
+		var levelKeysY = cachedLevelKeysPos[1];
+		var levelKeysScale = cachedLevelKeysScale;
+		var levelKeysAlpha = cachedLevelKeysAlpha;
+		if ((_keysDown[84] || (tPress = false)) && !tPress && (tPress = true)) {
+			cachedShowTimer = +!+(cachedShowTimer || 1) + '';
+			bfdia5b.setItem('timerMod.showTimer', cachedShowTimer);
+		}
+		if ((_keysDown[89] || (yPress = false)) && !yPress && (yPress = true)) {
+			cachedShowKeys = +!+(cachedShowKeys || 1) + '';
+			bfdia5b.setItem('timerMod.showKeys', cachedShowKeys);
+		}
 		redrawTimerTexts(
-			toHMS(getTimer() - levelTimer2), toHMS(best[currentLevel] || getTimer() - levelTimer2), toHMS(timer + getTimer() - levelTimer2),
+			toHMS(getTimerCached - levelTimer2), toHMS(best[currentLevel] || getTimerCached - levelTimer2), toHMS(timer + getTimerCached - levelTimer2),
 			levelTimerX, levelTimerY, levelTimerScale, levelTimerAlpha
 		);
 		redrawLevelKeys(
@@ -11231,7 +11388,7 @@ function toggleSpeedrunPracticeMode() {
 		}
 	}
 	else {
-		document.getElementById('TEMP').textContent = 'enabling...';
+		// document.getElementById('TEMP').textContent = 'enabling...';
 		for (let i = 0; i < speedrunPracticeBtns.length; i++) {
 			const btn = speedrunPracticeBtns[i];
 			if (!btn) continue;
@@ -11253,7 +11410,7 @@ let recover2Backup = 0;
 
 let levelHasBeenSaved = false; // check for whether a load is valid here or not
 function saveState() {
-
+	document.getElementById('TEMP').textContent = char[0].y; // debug
 	charBackups = new Array(charCount);
 	for (let i = 0; i < charCount; i++) {
 		// make a clone of the characters 
@@ -11701,7 +11858,7 @@ class Character {
 		this.expr = savedData.expr;
 		this.dExpr = savedData.dExpr;
 		this.acidDropTimer = savedData.acidDropTimer;
-		document.getElementById('TEMP').textContent = savedData.x;
+		document.getElementById('TEMP').textContent = savedData.y;
 	}
 }
 

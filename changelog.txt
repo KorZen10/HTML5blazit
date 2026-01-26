@@ -1,14 +1,17 @@
 THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
-1) Fix stay-after-finish displaying final time as one frame too long
-2) Fix Livesplit behavior of not loading best time after reset
-3) Improve overall performance (this mod is significantly laggier than the original timermod)
-4) Make a vertical Livesplit layout
-5) Add delta to Livesplit level entries
-6) Fix stay-after-finish positions resetting before wipe
+1) Improve overall performance (this mod is significantly laggier than the original timermod)
+2) Make a vertical Livesplit layout
+3) Add losing/gaining time colors in Livesplit
+4) Fix stay-after-finish displaying final time as one frame too long
+5) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
  
+01/26/25:
+-Added Delta to the Livesplit layout! Features ahead, behind, and gold splits.
+-Fixed the splits not updating properly following a reset.
+
 12/01/25:
 -Implemented the ability to remap keys from the level select screen. Fully functional but does not support remapping hotkeys used specifically by the speedrun mod itself. Also includes the ability to remap an additional key to the grab/throw input, which is currently allowed in the speedrun rules. Mapping multiple actions to the same input is blocked unless the two keys happen to be the two grab/throw keys.
 -Also made the background for the "CHANGE LAYOUT", as well as the loading screen, to be blue instead of the hideous barf color (seriously, Cary, could you pick a worse color?).
