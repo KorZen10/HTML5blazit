@@ -86,6 +86,8 @@ let levelName = new Array(levelCount);
 let mdao = new Array(levelCount);
 let mdao2 = 0;
 let levelProgress;
+let startLevelProgress;
+let furthestProgress = 0; // for Livesplit
 var best;
 var prev;
 let bonusProgress;
@@ -2313,15 +2315,11 @@ function stopSessionTimer() {
 		sessionTimerAccum += performance.now() - sessionTimerStartWallTime;
 		sessionTimerRunning = false;
 	}
-	// Compare current run time to fastest run and update if faster
-	compareFastestRun();
 	sessionTimerStartWallTime = null;
 }
 
-function compareFastestRun() {
-	// Only compare if we have a valid sessionTimerAccum (the run actually completed)
-	if (sessionTimerAccum <= 0) return;
-	
+function compareFastestRun() {	
+	console.log("here")
 	if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
 		// New fastest run!
 		fastestRunTime = sessionTimerAccum;
@@ -2360,6 +2358,14 @@ function resetSessionTimer() {
 			}
 			saveBestIndividualSplits();
 		}
+	}
+
+	console.log("levelProgress",levelProgress)
+	console.log("furthestProgress",furthestProgress)
+	// Compare current run time to fastest run and update if faster
+	if (levelProgress == 53 || levelProgress > furthestProgress) {
+		furthestProgress = levelProgress;
+		compareFastestRun();
 	}
 	
 	sessionTimerAccum = 0;
@@ -3100,6 +3106,7 @@ function menu8Menu() {
 }
 
 function beginNewGame() {
+	startLevelProgress = levelProgress;
 	// Reset session timer and per-run split state
 	setFps(60);
 	document.getElementById("fps-slider").value = 10;
@@ -8728,8 +8735,8 @@ function draw() {
 					try { document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry; } catch (e) {}
 					
 					// Stop session timer when level 52 is completed (last level in run - 1)
-					if (currentLevel === 51) {
-					// if (currentLevel === 1) {
+					// if (currentLevel === 51) {
+					if (currentLevel === 2) {
 						stopSessionTimer();
 					}
 					
