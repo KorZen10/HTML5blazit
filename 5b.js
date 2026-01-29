@@ -3277,7 +3277,7 @@ function drawLevelButton(text, x, y, id, color) {
 				else if (color == 3) fill = '#c6bc02';
 				else if (color == 4) fill = '#00a200';
 				if (bfdia5b.getItem('timerMod.showPrevTime') != 'true' && best[id]) clearTime -= 100;
-				
+
 				if (mouseIsDown) levelButtonClicked = id;
 				else if (rightMouseDown) resetBestTimeID = id;
 			}
@@ -11490,6 +11490,8 @@ function loadState() {
 	// Restore characters from their backups
 	for (let i = 0; i < charCount; i++) {
 		char[i].setVars(charBackups[i]);
+		// Clear stoodOnBy arrays since they need to be recalculated by physics in the next frame
+		char[i].stoodOnBy = [];
 	}
 
 	// Restore control and recover timer so the saved player regains input
@@ -12148,3 +12150,10 @@ function deselectAllTextBoxes() {
 	}
 	canvas.setAttribute('contenteditable', false);
 }
+
+// THINGS THAT NEED TO BE DUPLICATED FOR ANOTHER SAVE FILE [WIP]:
+// -levelProgress
+// -best completion data
+// -prev completion data
+// -death count
+// -WT count

@@ -9,7 +9,8 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
 01/29/25:
--Added ability to remove the best time from a single level individually by right-clicking the level in the menu
+-Added ability to remove the best time from a single level individually by right-clicking the level in the menu.
+-Fixed savestate bug where going straight from standing on object -> holding object causes player to rise up rapidly.
 
 01/26/25:
 -Added Delta to the Livesplit layout! Features ahead, behind, and gold splits.
