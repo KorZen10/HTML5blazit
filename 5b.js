@@ -2216,6 +2216,7 @@ let tool = 0;
 let selectedTile = 0;
 let mouseIsDown = false;
 let pmouseIsDown = false;
+let rightMouseDown = false;
 let mousePressedLastFrame;
 let LCEndGateX = 0;
 let LCEndGateY = 0;
@@ -3260,6 +3261,7 @@ function drawMenu2_3Button(id, x, y, action) {
 
 var exitedLevelTime;
 var clearTime = 10000;
+let resetBestTimeID = -1;
 function drawLevelButton(text, x, y, id, color) {
 	let fill = '#585858';
 	let newText;
@@ -3270,13 +3272,16 @@ function drawLevelButton(text, x, y, id, color) {
 	if (color > 1) {
 		if (mouseHover) {
 			onButton = true;
-			if (mouseIsDown) {
+			if (mouseIsDown || rightMouseDown) {
 				if (color == 2) fill = '#d56a00';
 				else if (color == 3) fill = '#c6bc02';
 				else if (color == 4) fill = '#00a200';
-				levelButtonClicked = id;
 				if (bfdia5b.getItem('timerMod.showPrevTime') != 'true' && best[id]) clearTime -= 100;
-			} else {
+				
+				if (mouseIsDown) levelButtonClicked = id;
+				else if (rightMouseDown) resetBestTimeID = id;
+			}
+			else {
 				if (color == 2) fill = '#ffaa55';
 				else if (color == 3) fill = '#ffff99';
 				else if (color == 4) fill = '#22ff22';
@@ -3284,7 +3289,13 @@ function drawLevelButton(text, x, y, id, color) {
 			if (bfdia5b.getItem('timerMod.showPrevTime') == 'true' && prev[id]) newText = toHMS(prev[id]);
 			else if (best[id]) newText = toHMS(best[id]);
 		}
-		if (levelButtonClicked === id) {
+		if (resetBestTimeID === id && !rightMouseDown) {
+			// reset the best time
+			best[id] = undefined;
+			saveGame();
+			resetBestTimeID = -1;
+		}
+		else if (levelButtonClicked === id) {
 			if (!mouseIsDown) {
 				levelButtonClicked = -1;
 				if (id <= levelProgress && clearTime > 6500) { // || (id > 99 && id < bonusProgress + 100)
@@ -8068,6 +8079,12 @@ function mousemove(event) {
 }
 
 function mousedown(event) {
+	// right click stuff first
+	if (event.button == 2) {
+		rightMouseDown = true;
+		return;
+	}
+
 	mouseIsDown = true;
 	lastClickX = _xmouse;
 	lastClickY = _ymouse;
@@ -8256,6 +8273,12 @@ function mousedown(event) {
 }
 
 function mouseup(event) {
+	// right click stuff first
+	if (rightMouseDown) {
+		rightMouseDown = false;
+		return;
+	}
+
 	mouseIsDown = false;
 
 	// Makes copying possible on Safari.
@@ -8499,6 +8522,7 @@ function setup() {
 		window.addEventListener('touchmove', touchmove);
 	}
 	canvas.addEventListener('paste', handlePaste);
+	document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 	if (localStorage.getItem("5beam_id")) loggedInExploreUser5beamID = localStorage.getItem("5beam_id");
 

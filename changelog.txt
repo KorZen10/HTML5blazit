@@ -7,7 +7,10 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 4) Fix stay-after-finish displaying final time as one frame too long
 5) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
- 
+
+01/29/25:
+-Added ability to remove the best time from a single level individually by right-clicking the level in the menu
+
 01/26/25:
 -Added Delta to the Livesplit layout! Features ahead, behind, and gold splits.
 -Fixed the splits not updating properly following a reset.
