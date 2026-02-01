@@ -2217,6 +2217,7 @@ let selectedTile = 0;
 let mouseIsDown = false;
 let pmouseIsDown = false;
 let rightMouseDown = false;
+let rightClickReleased = false;
 let mousePressedLastFrame;
 let LCEndGateX = 0;
 let LCEndGateY = 0;
@@ -3273,14 +3274,14 @@ function drawLevelButton(text, x, y, id, color) {
 	if (color > 1) {
 		if (mouseHover) {
 			onButton = true;
-			if (mouseIsDown || rightMouseDown) {
+			if (mouseIsDown || rightMouseDown || rightClickReleased) {
 				if (color == 2) fill = '#d56a00';
 				else if (color == 3) fill = '#c6bc02';
 				else if (color == 4) fill = '#00a200';
 				if (bfdia5b.getItem('timerMod.showPrevTime') != 'true' && best[id]) clearTime -= 100;
 
 				if (mouseIsDown) levelButtonClicked = id;
-				else if (rightMouseDown) resetBestTimeID = id;
+				else if (rightMouseDown || rightClickReleased) resetBestTimeID = id;
 			}
 			else {
 				if (color == 2) fill = '#ffaa55';
@@ -3295,6 +3296,7 @@ function drawLevelButton(text, x, y, id, color) {
 			best[id] = undefined;
 			saveGame();
 			resetBestTimeID = -1;
+			rightClickReleased = false;
 		}
 		else if (levelButtonClicked === id) {
 			if (!mouseIsDown) {
@@ -8302,6 +8304,7 @@ function mouseup(event) {
 	// right click stuff first
 	if (rightMouseDown) {
 		rightMouseDown = false;
+		rightClickReleased = true;
 		return;
 	}
 
