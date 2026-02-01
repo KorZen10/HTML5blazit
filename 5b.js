@@ -8109,6 +8109,7 @@ function mousemove(event) {
 function mousedown(event) {
 	// right click stuff first
 	if (event.button == 2) {
+		event.preventDefault();
 		rightMouseDown = true;
 		return;
 	}
@@ -8303,6 +8304,7 @@ function mousedown(event) {
 function mouseup(event) {
 	// right click stuff first
 	if (rightMouseDown) {
+		event.preventDefault();
 		rightMouseDown = false;
 		rightClickReleased = true;
 		return;
