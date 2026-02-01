@@ -1,4 +1,3 @@
-
 /* For testing the performance of any block of code. It averages every 100 runs and prints to the console. To use, simply place the following around the code block you'd like to test:
 performanceTest(()=>{
 }); */
@@ -55,7 +54,6 @@ let qTimer = 0;
 let inputText = '';
 let textAfterCursorAtClick = '';
 // let controlOrCommandPress = false;
-let noLag = false;
 
 let levelsString = '';
 let levelCount = 53;
@@ -86,8 +84,6 @@ let levelName = new Array(levelCount);
 let mdao = new Array(levelCount);
 let mdao2 = 0;
 let levelProgress;
-let startLevelProgress;
-let furthestProgress = 0; // for Livesplit
 var best;
 var prev;
 let bonusProgress;
@@ -98,103 +94,15 @@ let levelpackProgress = {};
 const bfdia5b = window.localStorage;
 let deathCount;
 let timer;
-let sessionTimerAccum = 0; // milliseconds accumulated while session has been running
-let sessionTimerStartWallTime = null; // performance.now() when running, null when stopped
-let sessionTimerLastEntry = null; // performance.now() when entering the last level, null if not in a level
-let sessionTimerRunning = false; // Whether session timer is currently counting
-
-// Per-run split state: these are reset by `beginNewGame()`.	
-// `sessionSplitTimes[level]` === null means no split recorded yet for this run.
-let sessionSplitTimes = new Array(levelCount).fill(null);
-// Track cumulative times (sessionTimerAccum at each level completion) for current run
-let sessionCumulTimes = new Array(levelCount).fill(null);
-// Track entry times (wallclock performance.now() when level was completed) for current run
-let sessionEntryTimes = new Array(levelCount).fill(null);
-// Current run deltas: difference between current split and fastest split (not stored in localStorage)
-let currentRunDeltas = new Array(levelCount).fill(null);
-// Best run tracking: stores the fastest total time and its cumulative times per level
-let fastestRunTime = null; // fastest total sessionTimerAccum when run completed
-let fastestRunCumulTimes = new Array(levelCount).fill(null); // cumulative times from fastest run
-let fastestRunEntryTimes = new Array(levelCount).fill(null); // entry times (wallclock) from fastest run
-let bestIndividualSplits = new Array(levelCount).fill(null); // best individual split times for each level
 let coins;
 let longMode = false;
-let quirksMode = true;
+let quirksMode = false;
 let enableExperimentalFeatures = window.location.hostname==='localhost';
 let screenShake = true;
 let screenFlashes = true;
-let frameRateThrottling = false;
+let frameRateThrottling = true;
 let slowTintsEnabled = true;
-let speedrunPracticeMode = true; // this enables/disables all speedrun features except for the livesplit timer
-// Populate after DOM is ready so getElementById returns real elements.
-let speedrunPracticeBtns = [];
-let fastRestart = false; // speedrun mod thing
-let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode'];
-
-// speedrun mod:
-let keyRemapsText = ['Jump','Switch player','Reset level','Move left','Move right', 'Grab/Throw object', 'Drop object', 'Advance dialogue', 'Additional "up" input'];
-let keyMappings = {jump: 32, switch: 90, reset: 82, left: 37, right: 39, grab: 38, drop: 40, talk: 13, grabExtra: 38};
-
-// When the layout editor asks the player to remap a control, this holds the index
-// of the action currently awaiting a keypress, or null when not listening.
-let keyRemapListeningIndex = null;
-
-// Helper: convert a keyCode to a short readable symbol for display on key visualization.
-function keyCodeToSymbol(code) {
-	if (code == null || typeof code === 'undefined') return '';
-	// Arrow keys and common symbols
-	const symbols = {
-		32: '⎵', 13: '⏎', 27: 'Esc', 9: 'Tab', 16: '⇧', 17: 'Ctrl', 18: 'Alt',
-		37: '←', 38: '↑', 39: '→', 40: '↓',
-		8: '⌫', 46: 'Del'
-	};
-	if (symbols[code]) return symbols[code];
-	// Letters & numbers: convert to lowercase character
-	if ((code >= 65 && code <= 90)) return String.fromCharCode(code).toLowerCase();
-	if ((code >= 48 && code <= 57)) return String.fromCharCode(code);
-	return String.fromCharCode(code).toLowerCase();
-}
-
-// Helper: convert a keyCode to a readable label for display in the remap UI.
-function keyCodeToLabel(code) {
-	if (code == null || typeof code === 'undefined') return '—';
-	// common named keys
-	const names = {
-		32: 'Space', 13: 'Enter', 27: 'Esc', 9: 'Tab', 16: 'Shift', 17: 'Ctrl', 18: 'Alt',
-		37: '←', 38: '↑', 39: '→', 40: '↓',
-		8: 'Backspace', 46: 'Del'
-	};
-	if (names[code]) return names[code];
-	// Letters & numbers (fallback): use fromCharCode if in printable range
-	if ((code >= 48 && code <= 90) || (code >= 96 && code <= 111)) {
-		try { return String.fromCharCode(code); } catch (e) { /* fallthrough */ }
-	}
-	return 'Key ' + code;
-}
-
-// Generate keyMapNames array dynamically from current keyMappings
-// Order: [jump, switch, reset, [empty], grab, left, drop, right, talk, grabExtra]
-// (The cached keymap name is just to help with efficiency)
-let cachedKeyMapNames = null;
-function getKeyMapNames() {
-	if (cachedKeyMapNames) return cachedKeyMapNames;
-	
-	const result = [
-		keyCodeToSymbol(keyMappings.jump),
-		keyCodeToSymbol(keyMappings.switch),
-		keyCodeToSymbol(keyMappings.reset),
-		'', // empty slot for visual spacing
-		keyCodeToSymbol(keyMappings.grab),
-		keyCodeToSymbol(keyMappings.left),
-		keyCodeToSymbol(keyMappings.drop),
-		keyCodeToSymbol(keyMappings.right),
-		keyCodeToSymbol(keyMappings.talk),
-		keyCodeToSymbol(keyMappings.grabExtra),
-	];
-	cachedKeyMapNames = result;
-	return result;
-}
-
+let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints'];
 let levelAlreadySharedToExplore = false;
 let lcSavedLevels;
 let nextLevelId;
@@ -241,8 +149,6 @@ function saveGame() {
 	bfdia5b.setItem('bonusesCleared', bonusesCleared);
 	bfdia5b.setItem('deathCount', deathCount);
 	bfdia5b.setItem('timer', timer);
-	// Save fastest run data
-	// saveFastestRun();
 }
 
 function getSavedGame() {
@@ -270,53 +176,12 @@ function getSavedGame() {
 		// }
 		bonusesCleared = new Array(33).fill(false);
 	}
-	// Load fastest run data
-	loadFastestRun();
 }
 getSavedGame();
 getSavedSettings();
 
-function saveFastestRun() {
-	console.log("saveFastestRun entered");
-
-	console.log("sessionSplitTimes:", sessionSplitTimes)
-	console.log("sessionCumulTimes:", sessionCumulTimes)
-	console.log("sessionEntryTimes:", sessionEntryTimes)
-
-	bfdia5b.setItem('fastestRunTime', fastestRunTime.toString());
-	bfdia5b.setItem('fastestRunCumulTimes', fastestRunCumulTimes.map(t => t === null ? 'null' : t.toString()).join(','));
-	bfdia5b.setItem('fastestRunEntryTimes', fastestRunEntryTimes.map(t => t === null ? 'null' : t.toString()).join(','));
-}
-
-function saveBestIndividualSplits() {
-	bfdia5b.setItem('bestIndividualSplits', bestIndividualSplits.map(t => t === null ? 'null' : t.toString()).join(','));
-}
-
-function loadFastestRun() {
-	const savedTime = bfdia5b.getItem('fastestRunTime');
-	if (savedTime !== null) {
-		fastestRunTime = parseInt(savedTime, 10);
-		const savedCumuls = bfdia5b.getItem('fastestRunCumulTimes');
-		if (savedCumuls) {
-			fastestRunCumulTimes = savedCumuls.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
-			if (document.getElementById('TEMP') !== null) {
-				document.getElementById('TEMP').textContent = fastestRunCumulTimes[0];
-			}
-		}
-		const savedEntryTimes = bfdia5b.getItem('fastestRunEntryTimes');
-		if (savedEntryTimes) {
-			fastestRunEntryTimes = savedEntryTimes.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
-		}
-		const savedBestIndividual = bfdia5b.getItem('bestIndividualSplits');
-		if (savedBestIndividual) {
-			bestIndividualSplits = savedBestIndividual.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
-		}
-	}
-}
-
 function saveSettings() {
-	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled, speedrunPracticeMode]));
-	toggleSpeedrunPracticeMode();
+	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled]));
 }
 
 function getSavedSettings() {
@@ -330,19 +195,6 @@ function getSavedSettings() {
 		enableExperimentalFeatures = settingsArray[3];
 		frameRateThrottling = settingsArray[4];
 		slowTintsEnabled = settingsArray[5];
-		speedrunPracticeMode = settingsArray[6];
-	}
-	// Load persisted key mappings (supports new JSON object/array format and legacy comma list)
-	const savedKeyMappingsRaw = bfdia5b.getItem('timerMod.keyMappings');
-	if (savedKeyMappingsRaw) {
-		const parsedKM = JSON.parse(savedKeyMappingsRaw);
-		if (Array.isArray(parsedKM) || (parsedKM && typeof parsedKM === 'object')) {
-			keyMappings = parsedKM;
-		} else {
-			// fallback to legacy CSV format
-			const parts = savedKeyMappingsRaw.split(',').map(s => parseInt(s, 10));
-			if (parts.length === keyMappings.length && parts.every(p => !isNaN(p))) keyMappings = parts;
-		}
 	}
 }
 
@@ -410,7 +262,6 @@ function getSavedLevelpackProgress() {
 }
 getSavedLevelpackProgress();
 
-getTimerCached = null; // this variable prevents us from having to call getTimer() multiple times per frame
 function getTimer() {
 	return _frameCount / 0.06;
 }
@@ -2216,7 +2067,6 @@ let tool = 0;
 let selectedTile = 0;
 let mouseIsDown = false;
 let pmouseIsDown = false;
-let rightMouseDown = false;
 let mousePressedLastFrame;
 let LCEndGateX = 0;
 let LCEndGateY = 0;
@@ -2275,235 +2125,6 @@ function toHMS(i) {
 	);
 }
 
-// Format milliseconds as MM:SS.mmm (minutes total, no hours)
-function toMMSSms(ms) {
-	const totalMs = Number(ms) || 0;
-	const minutes = Math.floor(totalMs / 60000);
-	const seconds = Math.floor((totalMs % 60000) / 1000);
-	const msecs = totalMs % 1000;
-	return (
-		minutes.toString().padStart(2, '0') + ':' +
-		seconds.toString().padStart(2, '0') + '.' +
-		msecs.toString().padStart(3, '0')
-	);
-}
-
-function updateSessionTimerDisplay() {
-	const timerDisplay = document.getElementById('timer-display');
-	if (timerDisplay) {
-		const ms = getSessionTimerMs();
-		if (timerDisplay) timerDisplay.textContent = toMMSSms(ms);
-	}
-}
-
-// Return current session timer in milliseconds (uses wall-clock so hidden tabs are accounted for)
-function getSessionTimerMs() {
-	if (sessionTimerRunning && sessionTimerStartWallTime != null) {
-		return Math.round(sessionTimerAccum + (performance.now() - sessionTimerStartWallTime));
-	}
-	return Math.round(sessionTimerAccum);
-}
-
-function startSessionTimer() {
-	if (!sessionTimerRunning) {
-		sessionTimerStartWallTime = performance.now();
-		sessionTimerRunning = true;
-	}
-}
-
-function stopSessionTimer() {
-	if (sessionTimerRunning) {
-		sessionTimerAccum += performance.now() - sessionTimerStartWallTime;
-		sessionTimerRunning = false;
-	}
-	sessionTimerStartWallTime = null;
-}
-
-function compareFastestRun() {	
-	console.log("here")
-	if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
-		// New fastest run!
-		fastestRunTime = sessionTimerAccum;
-		fastestRunCumulTimes = [...sessionCumulTimes]; // Copy current session cumulative times
-		fastestRunEntryTimes = sessionCumulTimes.map((cumul, i) => {
-			if (cumul == null) return null;
-			if (i === 0) return cumul;
-			const prev = sessionCumulTimes[i-1];
-			if (prev == null) return null;
-			return cumul - prev;
-		}); // Calculate split durations
-		saveFastestRun();
-	}
-}
-
-function resetSessionTimer() {
-	// Update best individual splits for all levels in this run before clearing
-	let hasNew = false;
-	let improvedLevels = [];
-	for (let levelId = 0; levelId < levelCount; levelId++) {
-		if (sessionSplitTimes[levelId] !== null) {
-			if (bestIndividualSplits[levelId] === null) {
-				bestIndividualSplits[levelId] = sessionSplitTimes[levelId];
-				hasNew = true;
-			} else if (sessionSplitTimes[levelId] < bestIndividualSplits[levelId]) {
-				improvedLevels.push(levelId);
-			}
-		}
-	}
-	if (hasNew) saveBestIndividualSplits();
-	if (improvedLevels.length > 0) {
-		const update = confirm(`Improved best splits for level${improvedLevels.length > 1 ? 's' : ''} ${improvedLevels.map(i => i + 1).join(', ')}! Update?`);
-		if (update) {
-			for (const levelId of improvedLevels) {
-				bestIndividualSplits[levelId] = sessionSplitTimes[levelId];
-			}
-			saveBestIndividualSplits();
-		}
-	}
-
-	console.log("levelProgress",levelProgress)
-	console.log("furthestProgress",furthestProgress)
-	// Compare current run time to fastest run and update if faster
-	if (levelProgress == 53 || levelProgress > furthestProgress) {
-		furthestProgress = levelProgress;
-		compareFastestRun();
-	}
-	
-	sessionTimerAccum = 0;
-	sessionTimerStartWallTime = null;
-	sessionTimerRunning = false;
-	// Clear session arrays so that updateSplitTime falls back to fastest run data
-	sessionSplitTimes.fill(null);
-	sessionCumulTimes.fill(null);
-	sessionEntryTimes.fill(null);
-	sessionTimerLastEntry = null;
-	updateSessionTimerDisplay();
-	// Update all livesplit entries to show fastest run times when a new run starts
-	updateAllLivesplitEntries();
-}
-
-function clearFastestRun() {
-	localStorage.removeItem('fastestRunTime');
-	localStorage.removeItem('fastestRunCumulTimes');
-	localStorage.removeItem('fastestRunEntryTimes');
-	localStorage.removeItem('bestIndividualSplits');
-	fastestRunTime = null;
-	fastestRunCumulTimes.fill(null);
-	fastestRunEntryTimes.fill(null);
-	bestIndividualSplits.fill(null);
-	updateAllLivesplitEntries();
-}
-
-function updateSplitTime(levelId) {
-	console.log("called updateSplitTime")
-	// Update the corresponding split entry in the DOM using stored `prev`/`best` values.
-	const el = document.getElementById('split-time-' + levelId);
-	// Prefer the session-run split (the duration between entering and exiting the level)
-	let value = null;
-	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
-		value = sessionSplitTimes[levelId];
-		document.getElementById('TEMP').textContent = "sessionSplitTimes:", sessionSplitTimes;
-	} else {
-		// Prefer explicit split (entry) times from the fastest run saved in storage.
-		// If not loaded into memory yet, try loading it.
-		if (typeof fastestRunEntryTimes === 'undefined' || (Array.isArray(fastestRunEntryTimes) && fastestRunEntryTimes.every(v => v == null))) {
-			loadFastestRun();
-		}
-		if (typeof fastestRunEntryTimes !== 'undefined' && fastestRunEntryTimes[levelId] != null) {
-			value = fastestRunEntryTimes[levelId];
-		} else if (typeof prev !== 'undefined' && prev[levelId] != undefined && prev[levelId] !== 'NaN') {
-			value = parseInt(prev[levelId], 10);
-		} else if (typeof best !== 'undefined' && best[levelId] != undefined && best[levelId] !== 'NaN') {
-			value = parseInt(best[levelId], 10);
-		}
-	}
-	if (value != null && !isNaN(value)) {
-		el.textContent = toMMSSms(value);
-	} else {
-		el.textContent = '\u2014'; // em dash for no time
-	}
-	
-	// Update cumulative time on the right side
-	const cumulEl = document.getElementById('split-cumul-time-' + levelId);
-	if (cumulEl) {
-		// Prefer current session cumulative time if we have an active split
-		if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
-			const sessionNow = getSessionTimerMs();
-			cumulEl.textContent = sessionNow > 0 ? toMMSSms(sessionNow) : '\u2014';
-		} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[levelId] != null && fastestRunCumulTimes[levelId] > 0) {
-			// Otherwise show fastest run cumulative time (only if it's valid)
-			cumulEl.textContent = toMMSSms(fastestRunCumulTimes[levelId]);
-		} else {
-			cumulEl.textContent = '\u2014';
-		}
-	}
-	
-	// Update delta between current run and fastest run
-	const deltaEl = document.getElementById('split-delta-' + levelId);
-	if (deltaEl) {
-		let delta = null;
-		if (sessionCumulTimes[levelId] != null && fastestRunCumulTimes[levelId] != null) {
-			delta = sessionCumulTimes[levelId] - fastestRunCumulTimes[levelId];
-		}
-		if (delta != null) {
-			const sign = delta >= 0 ? '+' : '-';
-			deltaEl.textContent = sign + toMMSSms(Math.abs(delta));
-
-			console.log("sessionSplitTimes[levelId]",sessionSplitTimes[levelId])
-			console.log("bestIndividualSplits[levelId]",bestIndividualSplits[levelId])
-
-			// Color gold if this split is the best individual, else red/green
-			if (sessionSplitTimes[levelId] < bestIndividualSplits[levelId]) {
-				deltaEl.style.color = 'gold';
-			} else {
-				deltaEl.style.color = delta > 0 ? 'red' : '#00FF00';
-			}
-		} else {
-			deltaEl.textContent = '';
-			deltaEl.style.color = '#999'; // default color
-		}
-	}
-}
-
-function updateAllLivesplitEntries() {
-	// Update all livesplit entries to display the fastest run times
-	// Called when a new run starts or after loading
-	try {
-		for (let i = 0; i < levelCount; i++) {
-			updateSplitTime(i);
-		}
-	} catch (e) {
-		// ignore if DOM not ready
-	}
-}
-
-function applyFastestRunToSession() {
-	// Copy fastest-run data into current session arrays so the UI shows them
-	// Ensure fastest-run arrays are loaded
-	if (!Array.isArray(fastestRunCumulTimes) || fastestRunCumulTimes.every(v => v == null)) {
-		loadFastestRun();
-	}
-	updateAllLivesplitEntries();
-}
-
-function createResetSplitsButton() {
-	try {
-		const container = document.getElementById('resetSplitsButton');
-		if (!container) return;
-		container.innerHTML = '';
-		const btn = document.createElement('button');
-		btn.type = 'button';
-		btn.id = 'loadSplitsFromStorage';
-		btn.textContent = 'Load Splits from Storage';
-		btn.addEventListener('click', () => {
-			applyFastestRunToSession();
-		});
-		container.appendChild(btn);
-	} catch (e) {
-		// ignore
-	}
-}
-
 // I missed processing's map() function so much I wrote my own that I think I stole parts of from stackoverflow, but didn't link to.
 function mapRange(value, min1, max1, min2, max2) {
 	return min2 + ((value - min1) / (max1 - min1)) * (max2 - min2);
@@ -2556,9 +2177,7 @@ let levelButtonClicked = -1;
 let showingNewGame2 = false;
 let showingExploreNewGame2 = false;
 
-let musicSound = new Audio('data/the fiber 16x loop.wav'); 
-// let jumpSound = new Audio('data/mario_jump.wav'); 
-// let deathSound = new Audio('data/lego_yoda.wav'); 
+let musicSound = new Audio('data/the fiber 16x loop.wav');
 // musicSound.addEventListener('canplaythrough', event => {incrementCounter();});
 
 const scaleFactor = 3;
@@ -2621,7 +2240,7 @@ async function loadingScreen() {
 	ctxReal.scale(pixelRatio, pixelRatio);
 
 	// Background
-	ctx.fillStyle = '#245A98';
+	ctx.fillStyle = '#999966';
 	ctx.fillRect(0, 0, cwidth, cheight);
 	// Text
 	ctx.fillStyle = '#000000';
@@ -2724,22 +2343,8 @@ async function loadingScreen() {
 }
 
 window.onload = function () {
-	initTimerKeysCache();
 	loadingScreen();
 };
-
-// Populate speedrun-related button references once DOM is ready
-document.addEventListener('DOMContentLoaded', function () {
-	speedrunPracticeBtns = [
-		document.getElementById('fps-slider'),
-		document.getElementById('pause-play-btn'),
-		document.getElementById('frame-adv-btn'),
-		document.getElementById('save-state-btn'),
-		document.getElementById('load-state-btn'),
-		document.getElementById('fast-restart-btn'),
-		document.getElementById('toggle-stay-btn'),
-	];
-});
 
 // https://stackoverflow.com/a/4819886/22438094
 function isTouchDevice() {
@@ -2767,39 +2372,6 @@ function setHoverText() {
 	if (canvas.getAttribute('title') != hoverText) {
 		if (hoverText == '') canvas.removeAttribute('title');
 		else canvas.setAttribute('title', hoverText);
-	}
-}
-
-function getSavedSettings() {
-	if (bfdia5b.getItem('settings') == undefined) {
-		saveSettings();
-	} else {
-		let settingsArray = JSON.parse(bfdia5b.getItem('settings'));
-		screenShake = settingsArray[0];
-		screenFlashes = settingsArray[1];
-		quirksMode = settingsArray[2];
-		enableExperimentalFeatures = settingsArray[3];
-		frameRateThrottling = settingsArray[4];
-		slowTintsEnabled = settingsArray[5];
-		speedrunPracticeMode = settingsArray[6];
-	}
-
-	// Load persisted key mappings (supports JSON arrays/objects and the legacy comma list)
-	const savedKeyMappingsRaw = bfdia5b.getItem('timerMod.keyMappings');
-	if (savedKeyMappingsRaw) {
-		// Try JSON parse first (object or array). Fall back to legacy comma-separated list.
-		try {
-			const parsedKM = JSON.parse(savedKeyMappingsRaw);
-			if (Array.isArray(parsedKM) || (parsedKM && typeof parsedKM === 'object')) {
-				keyMappings = parsedKM;
-			} else {
-				const parts = savedKeyMappingsRaw.split(',').map(s => parseInt(s, 10));
-				if (parts.length === keyMappings.length && parts.every(p => !isNaN(p))) keyMappings = parts;
-			}
-		} catch (e) {
-			const parts = savedKeyMappingsRaw.split(',').map(s => parseInt(s, 10));
-			if (parts.length === keyMappings.length && parts.every(p => !isNaN(p))) keyMappings = parts;
-		}
 	}
 }
 
@@ -3096,7 +2668,7 @@ function menu2Back() {
 }
 
 function menu3Menu() {
-	timer += getTimerCached - levelTimer2;
+	timer += getTimer() - levelTimer2;
 	saveGame();
 	exitLevel();
 }
@@ -3108,19 +2680,6 @@ function menu8Menu() {
 }
 
 function beginNewGame() {
-	startLevelProgress = levelProgress;
-	// Reset session timer and per-run split state
-	setFps(60);
-	document.getElementById("fps-slider").value = 10;
-	if (paused) togglePause(); // if game is paused somehow, unpause it
-	sessionSplitTimes = new Array(levelCount).fill(null);
-	sessionCumulTimes = new Array(levelCount).fill(null);
-	sessionEntryTimes = new Array(levelCount).fill(null);
-	currentRunDeltas = new Array(levelCount).fill(null);
-	levelEntryTimestamps = new Array(levelCount).fill(null);
-	// Reset livesplit scroll position to the left for a new run
-	if (document.getElementById('livesplit-entries')) document.getElementById('livesplit-entries').scrollLeft = 0;
-	resetSessionTimer();
 	clearVars();
 	saveGame();
 	enterBaseLevelpackLevelSelect();
@@ -3164,9 +2723,6 @@ function setQual() {
 }
 
 function exitLevel() {
-	// turn off ability to lead savestate so game won't crash
-	levelHasBeenSaved = false;
-
 	menuScreen = 2;
 }
 
@@ -3227,10 +2783,8 @@ function drawMenu0Button(text, x, y, grayed, action, width = menu0ButtonSize.w, 
 
 	drawRoundedRect(fill, x, y, width, height, menu0ButtonSize.cr);
 
-	// timer mod: add auto scaling based on width and height, clamp so text doesn't shrink too much
-	let _scale = Math.min(width / menu0ButtonSize.w, height / menu0ButtonSize.h);
-	_scale = Math.max(_scale, 0.6); // don't shrink below 80% of default
-	ctx.font = `bold ${30 * _scale}px Helvetica`;
+	// timer mod: add auto scaling
+	ctx.font = `bold ${width/menu0ButtonSize.w * 30}px Helvetica`;
 	ctx.fillStyle = '#666666';
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
@@ -3262,7 +2816,6 @@ function drawMenu2_3Button(id, x, y, action) {
 
 var exitedLevelTime;
 var clearTime = 10000;
-let resetBestTimeID = -1;
 function drawLevelButton(text, x, y, id, color) {
 	let fill = '#585858';
 	let newText;
@@ -3273,16 +2826,13 @@ function drawLevelButton(text, x, y, id, color) {
 	if (color > 1) {
 		if (mouseHover) {
 			onButton = true;
-			if (mouseIsDown || rightMouseDown) {
+			if (mouseIsDown) {
 				if (color == 2) fill = '#d56a00';
 				else if (color == 3) fill = '#c6bc02';
 				else if (color == 4) fill = '#00a200';
+				levelButtonClicked = id;
 				if (bfdia5b.getItem('timerMod.showPrevTime') != 'true' && best[id]) clearTime -= 100;
-
-				if (mouseIsDown) levelButtonClicked = id;
-				else if (rightMouseDown) resetBestTimeID = id;
-			}
-			else {
+			} else {
 				if (color == 2) fill = '#ffaa55';
 				else if (color == 3) fill = '#ffff99';
 				else if (color == 4) fill = '#22ff22';
@@ -3290,13 +2840,7 @@ function drawLevelButton(text, x, y, id, color) {
 			if (bfdia5b.getItem('timerMod.showPrevTime') == 'true' && prev[id]) newText = toHMS(prev[id]);
 			else if (best[id]) newText = toHMS(best[id]);
 		}
-		if (resetBestTimeID === id && !rightMouseDown) {
-			// reset the best time
-			best[id] = undefined;
-			saveGame();
-			resetBestTimeID = -1;
-		}
-		else if (levelButtonClicked === id) {
+		if (levelButtonClicked === id) {
 			if (!mouseIsDown) {
 				levelButtonClicked = -1;
 				if (id <= levelProgress && clearTime > 6500) { // || (id > 99 && id < bonusProgress + 100)
@@ -3314,8 +2858,8 @@ function drawLevelButton(text, x, y, id, color) {
 	}
 
 	if (transitionType == 2 && id == currentLevel) {
-		if (!exitedLevelTime) exitedLevelTime = getTimerCached;
-		else if (getTimerCached - exitedLevelTime >= 500 && !mouseHover) {
+		if (!exitedLevelTime) exitedLevelTime = getTimer();
+		else if (getTimer() - exitedLevelTime >= 500 && !mouseHover) {
 			exitedLevelTime = undefined;
 			transitionType = 1;
 		} else {
@@ -3514,26 +3058,6 @@ function drawLevelMap() {
 		() => bfdia5b.setItem('timerMod.showPrevTime', bfdia5b.getItem('timerMod.showPrevTime') != 'true'),
 		164.15, 23.20
 	);
-	drawMenu0Button('19', 100, 129.35, false, () => { levelProgress = 18; resetSessionTimer(); }, 
-		40, 23.20
-	);
-	drawMenu0Button('31', 150, 129.35, false, () => { levelProgress = 30; resetSessionTimer(); }, 
-		40, 23.20
-	);
-	drawMenu0Button('42', 200, 129.35, false, () => { levelProgress = 41; resetSessionTimer(); }, 
-		40, 23.20
-	);
-	drawMenu0Button('53', 250, 129.35, false, () => { levelProgress = 52; resetSessionTimer(); }, 
-		40, 23.20
-	);
-	// drawMenu0Button('+', 300, 129.35, false, () => { levelProgress++; }, 
-	drawMenu0Button('+', 295, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; resetSessionTimer(); }, 
-		25, 23.20
-	);
-	// drawMenu0Button('-', 330, 129.35, false, () => { levelProgress--; }, 
-	drawMenu0Button('-', 325, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; resetSessionTimer(); }, 
-		25, 23.20
-	);
 	for (let i = 0; i < (playingLevelpack?levelCount:133); i++) {
 		let j = i;
 		if (!playingLevelpack && j >= 100) j += 19;
@@ -3558,27 +3082,11 @@ function drawLevelButtons() {
 	ctx.textAlign = 'left';
 	ctx.textBaseline = 'top';
 	ctx.font = 'bold 32px Helvetica';
-	if (speedrunPracticeMode) ctx.fillText(currentLevelDisplayName, 12.85, 502.45);
-	else ctx.fillText(currentLevelDisplayName, 12.85, 495.45);
+	ctx.fillText(currentLevelDisplayName, 12.85, 495.45);
 	drawMenu2_3Button(0, 837.5, 486.95, playMode == 3 ? exitExploreLevel : playMode == 2 ? exitTestLevel : menu3Menu);
 }
-
-let stayInLevel = false; // this function only used for speedrun mod button to stay in level after completing it
-let levelBeat = false; // also just for speedrun mod
-let stayTimerActive = false; // true when stopTimerButStay() has stopped the session timer but we're staying in-level
-let freezeLevelTimer = false; // explicitly freeze levelTimer increments when true
-// When a level finishes we set a pendingResetAction so reset/exit is delayed until the wipe animation completes
-let pendingResetAction = null;
-// Cache for timer text strings to avoid regenerating every frame
-let _cachedTimerStr = null;
-let _cachedTimerMs = null;
-let _cachedBestStr = null;
-let _cachedBestMs = null;
-let _cachedTotalStr = null;
-let _cachedTotalMs = null;
-
 function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha = 0.6) {
-	if (cachedShowTimer == '0') return;
+	if (bfdia5b.getItem('timerMod.showTimer') == '0') return;
 	ctx.fillStyle = '#ffffff';
 	ctx.textAlign = 'left';
 	ctx.textBaseline = 'top';
@@ -3587,113 +3095,42 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 	ctx.fillText('Timer:', x, y);
 	ctx.fillText('Best:', x, y + 34 * scale);
 	ctx.fillText('Total:', x, y + 34 * 2 * scale);
-
-	// Cache formatted strings and only regenerate when values change
-	let displayTimerStr;
-	if (_cachedTimerMs !== timer) {
-		_cachedTimerMs = timer;
-		_cachedTimerStr = toHMS(timer);
-	}
-	displayTimerStr = _cachedTimerStr;
-
-	// Speedrun mod: if the level-timer is frozen (freezeLevelTimer), capture the frozen value once and keep showing that static value
-	const frozen = !!freezeLevelTimer || bfdia5b.getItem('timerMod.levelTimerFrozen') == '1';
-
-	if (frozen) {
-		if (typeof redrawTimerTexts._frozenTimerMs === 'undefined') {
-			// Capture the current frame-based level time (ms) at the moment of freeze
-			redrawTimerTexts._frozenTimerMs = timer;
-		}
-		if (redrawTimerTexts._frozenTimerMs !== null && !isNaN(redrawTimerTexts._frozenTimerMs)) {
-			displayTimerStr = toHMS(redrawTimerTexts._frozenTimerMs);
-		}
-	} else {
-		// Not frozen — clear any cached frozen value
-		redrawTimerTexts._frozenTimerMs = undefined;
-	}
-
-	// Color the primary timer green if stay-timer active, otherwise white
-	ctx.fillStyle = stayTimerActive ? '#44FF44' : '#ffffff';
-	ctx.fillText(displayTimerStr, x + 80 * scale, y);
-
-	// Cache best and total strings
-	if (_cachedBestMs !== best) {
-		_cachedBestMs = best;
-		_cachedBestStr = toHMS(best);
-	}
-	if (_cachedTotalMs !== total) {
-		_cachedTotalMs = total;
-		_cachedTotalStr = toHMS(total);
-	}
-
-	// Draw best/total in default (white) color
-	ctx.fillStyle = '#ffffff';
-	ctx.fillText(_cachedBestStr, x + 80 * scale, y + 34 * scale);
-	ctx.fillText(_cachedTotalStr, x + 80 * scale, y + 34 * 2 * scale);
+	ctx.fillText(timer, x + 80 * scale, y);
+	ctx.fillText(best, x + 80 * scale, y + 34 * scale);
+	ctx.fillText(total, x + 80 * scale, y + 34 * 2 * scale);
 	ctx.globalAlpha = 1;
 }
-// this is the timer for the speedrun mod; stop session timer but remain in level and render timer green
-function stopTimerButStay() {
-	stayTimerActive = true;
-	freezeLevelTimer = true;
-}
-// Build keyCoordinateMatrix dynamically from current keyMappings
-// (cached key matrix is just to help with efficiency)
-let cachedKeyMatrix = null;
-function getKeyCoordinateMatrix() {
-	if (cachedKeyMatrix) return cachedKeyMatrix;
-	
-	const matrix = {};
-	// Map action names to their visual coordinates
-	const coords = {
-		switch: [ [ 12.35, 17.00, 53.15, 52.40 ] ],
-		reset: [ [ 86.10, 17.00, 53.15, 52.40 ] ],
-		jump: [ [ -16.00, 74.00, 181.55, 53.00 ] ],
-		grabExtra: [ [ 305.00, 18.75, 48.00, 47.00 ] ], // grabExtra is right before grab so grab overwrites it if they're the same key
-		grab: [ [ 240.00, 13.85, 58.10, 57.25 ] ],
-		left: [ [ 180.00, 72.75, 58.10, 57.25 ] ],
-		drop: [ [ 240.00, 72.75, 58.10, 57.25 ] ],
-		right: [ [ 300.00, 72.75, 58.10, 57.25 ] ],
-		talk: [ [ 364.65, 17.00, 13.90, 38.00 ], [ 377.65, 17.00, 49.40, 92.10 ] ],
-	};
-	// Build matrix using current keycodes from keyMappings
-	for (const action in coords) {
-		const keyCode = keyMappings[action];
-		if (keyCode != null) matrix[keyCode] = coords[action];
-	}
-	cachedKeyMatrix = matrix;
-	return matrix;
-}
+var keyCoordinateMatrix = {
+	90: [ [ 12.35, 17.00, 53.15, 52.40 ] ],
+	82: [ [ 86.10, 17.00, 53.15, 52.40 ] ],
+	32: [ [ -16.00, 74.00, 181.55, 53.00 ] ],
+	38: [ [ 240.00, 13.85, 58.10, 57.25 ] ],
+	37: [ [ 180.00, 72.75, 58.10, 57.25 ] ],
+	40: [ [ 240.00, 72.75, 58.10, 57.25 ] ],
+	39: [ [ 300.00, 72.75, 58.10, 57.25 ] ],
+	13: [ [ 364.65, 17.00, 13.90, 38.00 ], [ 377.65, 17.00, 49.40, 92.10 ] ]
+};
 function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
-	if (cachedShowKeys == '0') return;
+	if (bfdia5b.getItem('timerMod.showKeys') == '0') return;
 	
-	const keyCoordinateMatrix = getKeyCoordinateMatrix();
 	ctx.globalAlpha = alpha;
 	for (var key of Object.keys(keyCoordinateMatrix)) {
 		ctx.fillStyle = _keysDown[key] ? '#0033CC' : '#666666';
-		// Shift+Enter also highlights the talk key
-		if (key == _keysDown[13] && _keysDown[16]) ctx.fillStyle = '#0033CC';
+		if (key == 13 && _keysDown[16]) ctx.fillStyle = '#0033CC';
 		var coords = keyCoordinateMatrix[key];
 		for (var coord of coords) ctx.fillRect(x + coord[0] * scale, y + coord[1] * scale, coord[2] * scale, coord[3] * scale);
 	}
 	ctx.fillStyle = '#000000';
 	ctx.textAlign = 'center';
 	ctx.font = `${32 * scale}px Helvetica`;
-	// keys array order matches keyMapNames: [jump(⎵), switch(z), reset(r), [empty], grab(↑), left(←), drop(↓), right(→), grabExtra, talk(⏎)]
-	// Visual positions: switch, reset, jump, grab(up), left, drop(down), right, talk, grabExtra
-	ctx.fillText(keys[1] || '', x + 13.35 * scale + 53.15/2 * scale, y + 26.00 * scale); // switch
-	ctx.fillText(keys[2] || '', x + 87.10 * scale + 53.15/2 * scale, y + 26.00 * scale); // reset
-	ctx.fillText(keys[0] || '', x - 15.00 * scale + 181.55/2 * scale, y + 85.00 * scale); // jump
-	ctx.fillText(keys[4] || '', x + 241.00 * scale + 58.10/2 * scale, y + 24.85 * scale); // grab (up)
-	ctx.fillText(keys[5] || '', x + 181.00 * scale + 58.10/2 * scale, y + 83.75 * scale); // left
-	ctx.fillText(keys[6] || '', x + 241.00 * scale + 58.10/2 * scale, y + 83.75 * scale); // drop (down)
-	ctx.fillText(keys[7] || '', x + 301.00 * scale + 58.10/2 * scale, y + 83.75 * scale); // right
-	ctx.fillText(keys[8] || '', x + 377.65 * scale + 49.40/2 * scale, y + 58.00 * scale); // talk
-	// grabExtra - smaller font size
-	const prevFont = ctx.font;
-	ctx.font = `${24 * scale}px Helvetica`;
-	ctx.fillText(keys[9] || '', x + 305.00 * scale + 48.00/2 * scale, y + 27.75 * scale); // grabExtra (smaller)
-	ctx.font = prevFont;
+	ctx.fillText(keys[0], x + 13.35 * scale + 53.15/2 * scale, y + 26.00 * scale);
+	ctx.fillText(keys[1], x + 87.10 * scale + 53.15/2 * scale, y + 26.00 * scale);
+	ctx.fillText(keys[2], x - 15.00 * scale + 181.55/2 * scale, y + 85.00 * scale);
+	ctx.fillText(keys[3], x + 241.00 * scale + 58.10/2 * scale, y + 24.85 * scale);
+	ctx.fillText(keys[4], x + 181.00 * scale + 58.10/2 * scale, y + 83.75 * scale);
+	ctx.fillText(keys[5], x + 241.00 * scale + 58.10/2 * scale, y + 83.75 * scale);
+	ctx.fillText(keys[6], x + 301.00 * scale + 58.10/2 * scale, y + 83.75 * scale);
+	ctx.fillText(keys[7], x + 377.65 * scale + 49.40/2 * scale, y + 58.00 * scale);
 	ctx.globalAlpha = 1;
 }
 
@@ -3701,22 +3138,14 @@ var levelTimerOffset, levelKeysOffset;
 var lastHover = 't';
 var tPress = false, yPress = false;
 function runLayoutEditor() {
-	ctx.fillStyle = '#245A98';
+	ctx.fillStyle = '#999966';
 	ctx.fillRect(0, 0, cwidth, cheight);
 	currentLevelDisplayName = 'Drag to organize; R to reset';
 	drawLevelButtons();
 
-	if (_keysDown[82] && keyRemapListeningIndex === null) { // don't wanna reset layout if just assigning a key
-		cachedShowTimer = '1';
-		cachedShowKeys = '1';
-		cachedLevelTimerPos = [6, 6];
-		cachedLevelTimerScale = 0.7;
-		cachedLevelTimerAlpha = 0.6;
-		cachedLevelKeysPos = [695, 3];
-		cachedLevelKeysScale = 0.6;
-		cachedLevelKeysAlpha = 0.45;
-		bfdia5b.setItem('timerMod.showTimer', '1');
-		bfdia5b.setItem('timerMod.showKeys', '1');
+	if (_keysDown[82]) {
+		bfdia5b.setItem('timerMod.showTimer', 1);
+		bfdia5b.setItem('timerMod.showKeys', 1);
 		bfdia5b.setItem('timerMod.levelTimerPos', '6,6');
 		bfdia5b.setItem('timerMod.levelTimerScale', '0.7');
 		bfdia5b.setItem('timerMod.levelTimerAlpha', '0.6');
@@ -3756,9 +3185,6 @@ function runLayoutEditor() {
 		} else levelTimerOffset = draggingScrollbar = false;
 	}
 	redrawTimerTexts('[T to hide]', '[↑/↓ to scale]', '[←/→ opacity]', levelTimerX, levelTimerY, levelTimerScale, levelTimerAlpha * (timerHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
-	cachedLevelTimerPos = [levelTimerX, levelTimerY];
-	cachedLevelTimerScale = levelTimerScale;
-	cachedLevelTimerAlpha = levelTimerAlpha;
 	bfdia5b.setItem('timerMod.levelTimerPos', `${levelTimerX.toFixed(3)},${levelTimerY.toFixed(3)}`);
 	bfdia5b.setItem('timerMod.levelTimerScale', levelTimerScale.toFixed(2));
 	bfdia5b.setItem('timerMod.levelTimerAlpha', levelTimerAlpha.toFixed(2));
@@ -3777,103 +3203,9 @@ function runLayoutEditor() {
 		} else levelKeysOffset = draggingScrollbar = false;
 	}
 	redrawLevelKeys([ '', '', '[Y to hide]', '', '', '', '', '' ], levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha * (keysHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
-	cachedLevelKeysPos = [levelKeysX, levelKeysY];
-	cachedLevelKeysScale = levelKeysScale;
-	cachedLevelKeysAlpha = levelKeysAlpha;
 	bfdia5b.setItem('timerMod.levelKeysPos', `${levelKeysX.toFixed(3)},${levelKeysY.toFixed(3)}`);
 	bfdia5b.setItem('timerMod.levelKeysScale', levelKeysScale.toFixed(2));
 	bfdia5b.setItem('timerMod.levelKeysAlpha', levelKeysAlpha.toFixed(2));
-
-	// TODO speedrun mod key remap instructions:
-	// 1) figure out how to make the key remap prompts visible (look into the options page for this) ✅
-
-	// Key remapping panel: centered on screen. Display each action name and its editable mapping box.
-	const rowH = 40;
-	const rows = keyRemapsText.length;
-	const panelH = rows * rowH;
-	const startY = Math.floor((cheight - panelH) / 2);
-	const mapW = 200;
-	const mapX = Math.floor(cwidth / 2 - mapW / 2);
-	const labelX = mapX - 20; // action name sits just to the left of the mapping box
-	// Standardize text size for this menu
-	const __prevFont = ctx.font;
-	ctx.font = '18px Helvetica';
-	for (var i = 0; i < keyRemapsText.length; i++) {
-		let y = startY + i * rowH;
-
-		// Action name (right-aligned), centered as a unit with its mapping box
-		ctx.fillStyle = '#ffffff';
-		ctx.textAlign = 'right';
-		ctx.fillText(keyRemapsText[i], labelX, y + 2);
-
-		// Mapping display area (box centered horizontally)
-		ctx.fillStyle = (keyRemapListeningIndex === i) ? '#3399ff' : '#444444';
-		ctx.fillRect(mapX, y, mapW, 28);
-
-		// Current mapping label or listening prompt
-		ctx.fillStyle = '#ffffff';
-		ctx.textAlign = 'center';
-		let label = '';
-		if (keyRemapListeningIndex === i) label = 'Press any key...';
-		else {
-			switch(i) {
-				case 0:
-					label = keyCodeToLabel(keyMappings.jump);
-					break;
-				case 1:
-					label = keyCodeToLabel(keyMappings.switch);
-					break;
-				case 2:
-					label = keyCodeToLabel(keyMappings.reset);
-					break;
-				case 3:
-					label = keyCodeToLabel(keyMappings.left);
-					break;
-				case 4:
-					label = keyCodeToLabel(keyMappings.right);
-					break;
-				case 5:
-					label = keyCodeToLabel(keyMappings.grab);
-					break;
-				case 6:
-					label = keyCodeToLabel(keyMappings.drop);
-					break;
-				case 7:
-					label = keyCodeToLabel(keyMappings.talk);
-					break;
-				case 8:
-					label = keyCodeToLabel(keyMappings.grabExtra);
-					break;
-			}
-		}
-		
-		keyCodeToLabel(keyMappings[i]);
-		ctx.fillText(label, mapX + mapW / 2, y + 2);
-
-		// Instructional text to the right of the box
-		ctx.textAlign = 'left';
-		ctx.fillStyle = '#ffffff';
-		ctx.fillText('(Click to edit)', mapX + mapW + 10, y + 2);
-
-		// Click -> toggle listening for a key press for this mapping
-		if (onRect(_xmouse, _ymouse, mapX, y, mapW, 28)) {
-			onButton = true;
-			if (mouseIsDown && !pmouseIsDown) {
-				// If already listening to this same mapping, cancel listening; else start/switch to this mapping
-				if (keyRemapListeningIndex === i) {
-					keyRemapListeningIndex = null;
-				} else {
-					keyRemapListeningIndex = i;
-				}
-			}
-		}
-	}
-	// Restore previous font after drawing remap panel
-	ctx.font = __prevFont;
-	// 2) make array (maybe?) that hold the words for these options ✅
-	// 3) make an array that holds the keycodes and their button images for these options ✅
-	// 4) make these variables update once the key remap has been established
-	// 5) save these changes to local storage
 }
 
 //https://thewebdev.info/2021/05/15/how-to-add-line-breaks-into-the-html5-canvas-with-filltext/
@@ -3966,20 +3298,8 @@ function fitString(context, str, maxWidth) {
 }
 
 function playLevel(i) {
-	document.getElementById('TEMP').textContent = 'Playing level ' + (i + 1);
 	if (i == levelProgress) playMode = 0;
 	else if (i < levelProgress) playMode = 1;
-	// Start session timer if playing level 1 and timer hasn't started yet
-	if (i === 0) {
-		startSessionTimer();
-	}
-
-	// Record entry timestamp for this attempt if the split hasn't been recorded yet this run
-	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] == null) {
-		// store session-based timestamp (milliseconds) so splits are based on session timer
-		sessionTimerLastEntry = getSessionTimerMs();
-		// try { document.getElementById('TEMP').textContent = sessionTimerLastEntry; } catch (e) {}
-	}
 	currentLevel = i;
 	wipeTimer = 30;
 	menuScreen = 3;
@@ -3989,11 +3309,6 @@ function playLevel(i) {
 }
 
 function resetLevel() {
-	document.getElementById('TEMP').textContent = 'Resetting level';
-	// when resetting/entering a level, clear any stay/beat/freeze state
-	levelBeat = false;
-	stayTimerActive = false;
-	freezeLevelTimer = false;
 	HPRCBubbleFrame = 0;
 	tileDepths = [[], [], [], []];
 	if (playMode == 2) {
@@ -4200,7 +3515,7 @@ function resetLevel() {
 	gotThisCoin = false;
 	levelTimer = 0;
 	recoverTimer = 0;
-	levelTimer2 = getTimerCached;
+	levelTimer2 = getTimer();
 	if (char[0].charState <= 9) changeControl();
 
 	doorLightFade = new Array(charCount2).fill(0);
@@ -4228,21 +3543,6 @@ function copyLevel(thatLevel) {
 }
 
 function drawStaticTiles() {
-	// Clear offscreen canvases first so repeated calls (e.g. on loadState)
-	// don't accumulate drawings on top of previous contents
-	if (typeof osctx1 !== 'undefined' && osctx1) {
-		osctx1.save();
-		osctx1.setTransform(1, 0, 0, 1, 0, 0);
-		osctx1.clearRect(0, 0, osc1.width, osc1.height);
-		osctx1.restore();
-	}
-	if (typeof osctx2 !== 'undefined' && osctx2) {
-		osctx2.save();
-		osctx2.setTransform(1, 0, 0, 1, 0, 0);
-		osctx2.clearRect(0, 0, osc2.width, osc2.height);
-		osctx2.restore();
-	}
-
 	for (let j = 0; j < tileDepths[0].length; j++) {
 		addTileMovieClip(tileDepths[0][j].x, tileDepths[0][j].y, osctx1);
 	}
@@ -5546,7 +4846,6 @@ function displayLine(level, line) {
 
 function startDeath(i) {
 	if (char[i].deathTimer >= 30 && (char[i].charState >= 7 || char[i].temp >= 50)) {
-		// deathSound.play();
 		if (ifCarried(i)) {
 			char[char[i].carriedBy].vy = 0;
 			char[char[i].carriedBy].vx = 0;
@@ -8105,12 +7404,6 @@ function mousemove(event) {
 }
 
 function mousedown(event) {
-	// right click stuff first
-	if (event.button == 2) {
-		rightMouseDown = true;
-		return;
-	}
-
 	mouseIsDown = true;
 	lastClickX = _xmouse;
 	lastClickY = _ymouse;
@@ -8174,7 +7467,7 @@ function mousedown(event) {
 			// 	}
 			// }
 		} else {
-			if (selectedTab == 2 && !_keysDown[keyMappings.jump]) {
+			if (selectedTab == 2 && !_keysDown[32]) {
 				if (tool != 4) {
 					setUndo();
 				}
@@ -8299,12 +7592,6 @@ function mousedown(event) {
 }
 
 function mouseup(event) {
-	// right click stuff first
-	if (rightMouseDown) {
-		rightMouseDown = false;
-		return;
-	}
-
 	mouseIsDown = false;
 
 	// Makes copying possible on Safari.
@@ -8336,77 +7623,8 @@ function mouseup(event) {
 	}
 }
 
-// in the case that you try to remap a key to one already in use, say no
-function compareOtherKeys(code, isGrab) {
-	document.getElementById('TEMP').textContent = (code == keyMappings.jump) ? 'true' : 'false';
-	if (code == keyMappings.jump) return true;
-	else if (code == keyMappings.switch) return true;
-	else if (code == keyMappings.reset) return true;
-	else if (code == keyMappings.left) return true;
-	else if (code == keyMappings.right) return true;
-	else if (code == keyMappings.grab && !isGrab) return true;
-	else if (code == keyMappings.drop) return true;
-	else if (code == keyMappings.talk) return true;
-	else if (code == keyMappings.grabExtra && !isGrab) return true;
-	return false;
-}
-
 function keydown(event) {
 	_keysDown[event.keyCode || event.charCode] = true;
-
-	// If we are currently remapping a key in the layout editor, capture the pressed key
-	// and update the mapping for that action. Prevent further handling by returning early.
-	if (keyRemapListeningIndex !== null) {
-		const code = event.keyCode || event.which || event.charCode;
-		if (typeof code !== 'undefined' && !isNaN(code)) {
-			switch (keyRemapListeningIndex) {
-				case 0:
-					if (compareOtherKeys(code, false)) break;
-					keyMappings.jump = code;
-					break;
-				case 1:
-					if (compareOtherKeys(code, false)) break;
-					keyMappings.switch = code;
-					break;
-				case 2:
-					if (compareOtherKeys(code, false)) break;
-					keyMappings.reset = code;
-					break;
-				case 3:
-					if (compareOtherKeys(code, false)) break;
-					keyMappings.left = code;
-					break;
-				case 4:
-					if (compareOtherKeys(code, false)) break;
-					keyMappings.right = code;
-					break;
-				case 5:
-					if (compareOtherKeys(code, true)) break;
-					keyMappings.grab = code;
-					break;
-				case 6:
-					if (compareOtherKeys(code, false)) break;
-					keyMappings.drop = code;
-					break;
-				case 7:
-					if (compareOtherKeys(code, false)) break;
-					keyMappings.talk = code;
-					break;
-				case 8:
-					if (compareOtherKeys(code, true)) break;
-					keyMappings.grabExtra = code;
-					break;
-			}
-			bfdia5b.setItem('timerMod.keyMappings', JSON.stringify(keyMappings));
-			// Invalidate caches when mappings change
-			cachedKeyMatrix = null;
-			cachedKeyMapNames = null;
-		}
-		keyRemapListeningIndex = null;
-		// stop further handling of this key press while remapping
-		event.preventDefault?.();
-		return;
-	}
 
 	if (editingTextBox && event.key) {
 		if (currentTextBoxAllowsLineBreaks && event.key == 'v' && (event.metaKey || event.ctrlKey)) {
@@ -8450,24 +7668,6 @@ function keydown(event) {
 			lcPan = [0,0];
 			updateLCtiles();
 		}
-	}
-
-	// speedrun mod shortcuts
-	if (speedrunPracticeMode) {
-		// this one's for changing the speed warp
-		if (event.key >= '0' && event.key <= '9') {
-			let correctKey = (event.key > '0') ? event.key : 10;
-			document.getElementById('fps-slider').value = (correctKey);
-			setFps(correctKey * 6);
-		}
-
-		// pausing and frame-advancing
-		if (event.key ===  'g') togglePausePlay();
-		if (event.key ===  'h') advanceFrame();
-
-		// saving/loading the savestate
-		if (event.key === 'w') saveState();
-		if (event.key === 'e') loadState();
 	}
 }
 
@@ -8548,7 +7748,6 @@ function setup() {
 		window.addEventListener('touchmove', touchmove);
 	}
 	canvas.addEventListener('paste', handlePaste);
-	document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 	if (localStorage.getItem("5beam_id")) loggedInExploreUser5beamID = localStorage.getItem("5beam_id");
 
@@ -8583,125 +7782,7 @@ function setup() {
 			});
 	} else {
 		rAF60fps();
-		toggleSpeedrunPracticeMode();
 	}
-
-	// Generate Livesplit entries (52) in the UI.
-	// The game script can run before the DOM body is parsed (script is in <head>),
-	// so defer creation until the document is ready. This avoids silently failing
-	// when `#livesplit-entries` doesn't yet exist.
-	function createLivesplitEntries() {
-		try {
-			const splitsContainer = document.getElementById('livesplit-entries');
-			if (!splitsContainer) return;
-			// clear any existing content
-			splitsContainer.innerHTML = '';
-			for (let i = 0; i < 52; i++) {
-				const entry = document.createElement('div');
-				entry.className = 'livesplit-entry';
-				entry.id = 'split-entry-' + i;
-				const name = document.createElement('div');
-				name.className = 'entry-name';
-				name.id = 'split-name-' + i;
-				// If levelName is available use it, otherwise fall back to a generic label.
-				name.textContent = 'Level ' + (i + 1) + (levelName && levelName[i] ? ': ' + levelName[i] : '');
-
-				// Container for both times on the same line
-				const timesRow = document.createElement('div');
-				timesRow.className = 'entry-times-row';
-
-				// Left side: individual split time (time for this level only)
-				const time = document.createElement('div');
-				time.className = 'entry-time';
-				time.id = 'split-time-' + i;
-				// Prefer session split (this run) if present, otherwise show fastest run, then prev/best or em dash
-				if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
-					time.textContent = toMMSSms(sessionSplitTimes[i]);
-				} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[i] != null) {
-					// Calculate split from fastest run: cumul[i] - cumul[i-1]
-					const prevCumul = i > 0 && fastestRunCumulTimes[i - 1] != null ? fastestRunCumulTimes[i - 1] : 0;
-					const split = fastestRunCumulTimes[i] - prevCumul;
-					time.textContent = toMMSSms(split);
-				} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
-					time.textContent = toMMSSms(parseInt(prev[i], 10));
-				} else {
-					time.textContent = '\u2014';
-				}
-
-				// Right side: cumulative time (session timer accumulation at this point)
-				const cumulTime = document.createElement('div');
-				cumulTime.className = 'entry-cumul-time';
-				cumulTime.id = 'split-cumul-time-' + i;
-				// Show current session timer if available, otherwise show fastest run cumulative time or em dash
-				const sessionNow = typeof getSessionTimerMs === 'function' ? getSessionTimerMs() : sessionTimerAccum;
-				if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
-					cumulTime.textContent = toMMSSms(sessionNow);
-				} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[i] != null && fastestRunCumulTimes[i] > 0) {
-					cumulTime.textContent = toMMSSms(fastestRunCumulTimes[i]);
-				} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
-					cumulTime.textContent = toMMSSms(parseInt(prev[i], 10));
-				} else {
-					cumulTime.textContent = '\u2014';
-				}
-
-				// Middle: delta between current run and fastest run
-				const delta = document.createElement('div');
-				delta.className = 'entry-delta';
-				delta.id = 'split-delta-' + i;
-				delta.textContent = ''; // Initially empty
-
-				timesRow.appendChild(time);
-				timesRow.appendChild(delta);
-				timesRow.appendChild(cumulTime);
-
-				entry.appendChild(name);
-				entry.appendChild(timesRow);
-				splitsContainer.appendChild(entry);
-				splitsContainer.onfocus="this.blur()"
-			}
-		} catch (e) {
-			// ignore DOM errors during setup
-		}
-	}
-
-	if (document.readyState === 'loading') {
-		window.addEventListener('DOMContentLoaded', () => {
-			createLivesplitEntries();
-			updateAllLivesplitEntries();
-		});
-	} else {
-		// Document already ready
-		createLivesplitEntries();
-		updateAllLivesplitEntries();
-	}
-}
-
-// Cached localStorage values for timer/keys display (avoids reading storage every frame)
-let cachedShowTimer = null;
-let cachedShowKeys = null;
-let cachedLevelTimerPos = [6, 6];
-let cachedLevelTimerScale = 0.7;
-let cachedLevelTimerAlpha = 0.6;
-let cachedLevelKeysPos = [695, 3];
-let cachedLevelKeysScale = 0.6;
-let cachedLevelKeysAlpha = 0.45;
-
-// Initialize cached values from localStorage
-function initTimerKeysCache() {
-	cachedShowTimer = bfdia5b.getItem('timerMod.showTimer') || '1';
-	cachedShowKeys = bfdia5b.getItem('timerMod.showKeys') || '1';
-	const timerPos = bfdia5b.getItem('timerMod.levelTimerPos')?.split(',');
-	if (timerPos) {
-		cachedLevelTimerPos = [parseFloat(timerPos[0]) || 6, parseFloat(timerPos[1]) || 6];
-	}
-	cachedLevelTimerScale = parseFloat(bfdia5b.getItem('timerMod.levelTimerScale')) || 0.7;
-	cachedLevelTimerAlpha = parseFloat(bfdia5b.getItem('timerMod.levelTimerAlpha')) || 0.6;
-	const keysPos = bfdia5b.getItem('timerMod.levelKeysPos')?.split(',');
-	if (keysPos) {
-		cachedLevelKeysPos = [parseFloat(keysPos[0]) || 695, parseFloat(keysPos[1]) || 3];
-	}
-	cachedLevelKeysScale = parseFloat(bfdia5b.getItem('timerMod.levelKeysScale')) || 0.6;
-	cachedLevelKeysAlpha = parseFloat(bfdia5b.getItem('timerMod.levelKeysAlpha')) || 0.45;
 }
 
 function draw() {
@@ -8710,7 +7791,6 @@ function draw() {
 	onTextBox = false;
 	onScrollbar = false;
 	mousePressedLastFrame = pmouseIsDown && !mouseIsDown;
-	getTimerCached = getTimer();
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
 	if (menuScreen == 2 || menuScreen == 3) ctx.translate(Math.floor(-cameraX + shakeX), Math.floor(-cameraY + shakeY));
 	switch (menuScreen) {
@@ -8735,120 +7815,57 @@ function draw() {
 			break;
 
 		case 3:
+			// TODO: Look into if it would be more accurate to the Flash version if this were moved to after the game logic.
+			// ctx.drawImage(
+			// 	osc4,
+			// 	-Math.floor((Math.max(cameraX, 0) + shakeX) / 1.5 + (cameraX < 0 ? cameraX / 3 : 0)),
+			// 	-Math.floor((Math.max(cameraY, 0) + shakeY) / 1.5 + (cameraY < 0 ? cameraY / 3 : 0)),
+			// 	osc4.width / pixelRatio,
+			// 	osc4.height / pixelRatio
+			// );
 			ctx.drawImage(osc4, -Math.floor(-cameraX + shakeX) + Math.floor( (-cameraX+shakeX)/3), -Math.floor(-cameraY + shakeY) + Math.floor( Math.max( -cameraY/3 - ((bgXScale>bgYScale)?Math.max(0,(bgXScale*5.4-540)/2):0), 540 - osc4.height / pixelRatio) + shakeY/3), osc4.width / pixelRatio, osc4.height / pixelRatio);
 			drawLevel(ctx);
-			
-			if (wipeTimer == 30 && menuScreen != 4 && charsAtEnd >= charCount2) levelBeat = true;
 
 			if (wipeTimer == 30) {
-				document.getElementById('TEMP').textContent = 'Resetting level';
 				if (transitionType == 0) {
 					// resetting preexisting level
 					// timer mod: took this OUT of quirks mode
-					// timer += getTimerCached - levelTimer2;
+					timer += getTimer() - levelTimer2;
 					resetLevel();
-				} 
-
-				if (charsAtEnd >= charCount2) {
+				} else if (charsAtEnd >= charCount2) {
 					// beat the level!
 					if (playMode != 2 && gotThisCoin && !gotCoin[currentLevel]) {
 						gotCoin[currentLevel] = true;
 						coins++;
 						// bonusProgress = Math.floor(coins * 0.33);
 					}
-					// timer += getTimerCached - levelTimer2; // Removed: timer is added below in the level end logic
-					best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimerCached - levelTimer2).toFixed(0));
-					prev[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
-					// Compute split based on session timer: sessionNow - sessionTimerLastEntry
-					const sessionNow = getSessionTimerMs();
-					let elapsedMs = null;
-					if (sessionTimerLastEntry != null) {
-						elapsedMs = Math.round(sessionNow - sessionTimerLastEntry);
-					} else {
-						// fallback to previous timing if sessionTimerLastEntry wasn't set
-						elapsedMs = parseInt((getTimerCached - levelTimer2).toFixed(0), 10);
-					}
-					if (sessionSplitTimes[currentLevel] == null) {
-						sessionSplitTimes[currentLevel] = elapsedMs;
-					}
-					// Track cumulative time at this level completion
-					if (sessionCumulTimes[currentLevel] == null) {
-						sessionCumulTimes[currentLevel] = sessionNow;
-					}
-					// Track entry time (wallclock when this level was completed) at this level
-					if (sessionEntryTimes[currentLevel] == null) {
-						sessionEntryTimes[currentLevel] = performance.now();
-					}
-					updateSplitTime(currentLevel);
-					// update sessionTimerLastEntry so the next split measures from this point
-					sessionTimerLastEntry = sessionNow;
-					try { document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry; } catch (e) {}
-					
-					// Stop session timer when level 52 is completed (last level in run - 1)
-					if (currentLevel === 51) {
-					// if (currentLevel === 2) {
-						stopSessionTimer();
-					}
-					
-					// Auto-scroll livesplit entries one entry to the right so the newly-completed
-					// split becomes visible. This is guarded so it won't throw if the DOM
-					// element doesn't exist (e.g., running without the UI present).
-					const container = document.getElementById('livesplit-entries');
-					if (container) {
-						const firstEntry = container.querySelector('.livesplit-entry');
-						if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
-							const style = window.getComputedStyle(firstEntry);
-							const marginRight = parseFloat(style.marginRight) || 0;
-							
-							// const amount = Math.round(firstEntry.getBoundingClientRect().width + marginRight);
-							const amount = Math.round(firstEntry.getBoundingClientRect().width + 4.1);
-							if (typeof container.scrollBy === 'function') {
-								container.scrollBy({ left: amount, behavior: 'smooth' });
-							} else {
-								container.scrollLeft += amount;
-							}
-						}
-					}
-
-					if (!freezeLevelTimer) {
-						timer += getTimerCached - levelTimer2;
-						best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimerCached - levelTimer2).toFixed(0));
-						prev[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
-					}
-
-					if (playMode == 0 && !stayInLevel) {
+					timer += getTimer() - levelTimer2;
+					best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimer() - levelTimer2).toFixed(0));
+					prev[currentLevel] = (getTimer() - levelTimer2).toFixed(0);
+					if (playMode == 0) {
 						currentLevel++;
 						if (!quirksMode) toSeeCS = true; // This line was absent in the original source, but without it dialogue doesn't play after level 1 when on a normal playthrough.
 						levelProgress = currentLevel;
-						// disable savestates so game doesn't crash when it tries to savestate
-						levelHasBeenSaved = false;
-
 						if (currentLevel < levelCount) resetLevel();
 						else exitLevel();
-					}
-					else if (!stayInLevel) {
+					} else {
 						if (playMode == 3) {
 							exitExploreLevel();
 						} else if (playMode == 2) {
 							exitTestLevel();
 						} else {
-							freeze = true;
 							exitLevel();
+							// if (currentLevel > 99) {
+							// 	bonusesCleared[currentLevel - 100] = true;
+							// }
 						}
 					}
 					saveGame();
 				}
 			}
-			else if (stayInLevel && levelBeat) {
-				stopTimerButStay();
-				if (transitionType == 0) {
-					resetLevel();
-				}
-			}
-			// document.getElementById('TEMP').textContent = wipeTimer;
 
 			if (cutScene == 1 || cutScene == 2) {
-				if (_keysDown[keyMappings.talk]) {
+				if (_keysDown[13] || _keysDown[16]) {
 					if (!csPress && cutScene == 1) {
 						cutSceneLine++;
 						if (cutSceneLine >= cLevelDialogueChar.length) endCutScene();
@@ -8864,27 +7881,26 @@ function draw() {
 					if (recover) {
 						char[control].justChanged = 2;
 						if (recoverTimer == 0) {
-							if (_keysDown[keyMappings.left]) {
+							if (_keysDown[37]) {
 								if (!leftPress) recoverCycle(HPRC2, -1);
 								leftPress = true;
 							} else leftPress = false;
-							if (_keysDown[keyMappings.right]) {
+							if (_keysDown[39]) {
 								if (!rightPress) recoverCycle(HPRC2, 1);
 								rightPress = true;
 							} else rightPress = false;
 						}
 					} else {
 						if (cornerHangTimer == 0) {
-							if (_keysDown[keyMappings.left]) {
+							if (_keysDown[37]) {
 								char[control].moveHorizontal(-power);
-							} else if (_keysDown[keyMappings.right]) {
+							} else if (_keysDown[39]) {
 								char[control].moveHorizontal(power);
 							}
 						}
-						if (!_keysDown[keyMappings.left] && !_keysDown[keyMappings.right]) char[control].stopMoving();
+						if (!_keysDown[37] && !_keysDown[39]) char[control].stopMoving();
 					}
-					// maintaining typical OS functionality; you can press either grab key to grab
-					if ((_keysDown[keyMappings.grab] || _keysDown[keyMappings.grabExtra])) {
+					if (_keysDown[38]) {
 						if (!upPress) {
 							if (recover && recoverTimer == 0) {
 								recoverTimer = 60;
@@ -8939,7 +7955,7 @@ function draw() {
 						}
 						upPress = true;
 					} else upPress = false;
-					if (_keysDown[keyMappings.drop]) {
+					if (_keysDown[40]) {
 						if (!downPress) {
 							if (char[control].carry) putDown(control);
 							else if (recover) {
@@ -8963,14 +7979,14 @@ function draw() {
 						}
 						downPress = true;
 					} else downPress = false;
-					if (_keysDown[keyMappings.switch]) {
+					if (_keysDown[90]) {
 						if (!qPress && !recover) {
 							changeControl();
 							qTimer = 6;
 						}
 						qPress = true;
 					} else qPress = false;
-					if (_keysDown[keyMappings.jump]) {
+					if (_keysDown[32]) {
 						if (
 							(char[control].onob || char[control].submerged == 3) &&
 							char[control].landTimer > 2 &&
@@ -8985,9 +8001,8 @@ function draw() {
 				}
 			}
 
-			if (_keysDown[keyMappings.reset] && wipeTimer == 0) {
-				// if specified fast restarts, set wipeTimer already to 29
-				wipeTimer = (fastRestart) ? 29 : 1;
+			if (_keysDown[82] && wipeTimer == 0) {
+				wipeTimer = 1;
 				transitionType = 0;
 				// if (cutScene == 1) csBubble.gotoAndPlay(17);
 			}
@@ -9112,7 +8127,6 @@ function draw() {
 								) {
 									if (Math.floor(char[i].x / 30) == x) {
 										let rot = (char[i].x - Math.floor(char[i].x / 30) * 30 - 15) * 5;
-										document.getElementById('TEMP').textContent = rot;
 										if (
 											(rot < tileFrames[y][x].rotation && char[i].vx < 0) ||
 											(rot > tileFrames[y][x].rotation && char[i].vx > 0)
@@ -9485,8 +8499,7 @@ function draw() {
 				shakeX = 0;
 				shakeY = 0;
 			}
-			// Only advance the internal level timer when not frozen by a stay-in-level state
-			if (!freezeLevelTimer) levelTimer++;
+			levelTimer++;
 			break;
 
 		case 5:
@@ -10371,7 +9384,7 @@ function draw() {
 				}
 			}
 
-			if (mouseIsDown && _keysDown[keyMappings.jump]) {
+			if (mouseIsDown && _keysDown[32]) {
 				lcPan[0] += _xmouse - _pxmouse;
 				lcPan[1] += _ymouse - _pymouse;
 				updateLCtiles();
@@ -10418,7 +9431,7 @@ function draw() {
 			}
 			x = Math.floor((shiftedXMouse - (330 - (scale * levelWidth) / 2)) / scale);
 			y = Math.floor((shiftedYMouse - (240 - (scale * levelHeight) / 2)) / scale);
-			if (mouseIsDown && !_keysDown[keyMappings.jump]) {
+			if (mouseIsDown && !_keysDown[32]) {
 				if (selectedTab == 2) {
 					if (tool <= 1 && mouseOnGrid()) {
 						if (tool == 1) i = 0;
@@ -10644,8 +9657,7 @@ function draw() {
 				ctx.globalAlpha = 1;
 			}
 
-			// Only advance the internal level timer when not frozen by a stay-in-level state
-			if (!freezeLevelTimer) levelTimer++;
+			levelTimer++;
 			if (lcPopUpNextFrame) lcPopUp = true;
 			lcPopUpNextFrame = false;
 			break;
@@ -11021,9 +10033,6 @@ function draw() {
 						break;
 					case 5:
 						thisOptionValue = slowTintsEnabled;
-						break;
-					case 6:
-						thisOptionValue = speedrunPracticeMode;
 				}
 				ctx.fillStyle = thisOptionValue?'#00ff00':'#ff0000';
 				ctx.fillText(thisOptionValue?'on':'off', 615, y+2);
@@ -11049,9 +10058,6 @@ function draw() {
 								break;
 							case 5:
 								slowTintsEnabled = !slowTintsEnabled;
-								break;
-							case 6:
-								speedrunPracticeMode = !speedrunPracticeMode;
 								break;
 						}
 					}
@@ -11298,29 +10304,23 @@ function draw() {
 			drawCutScene();
 		}
 
-		// Use cached values instead of reading localStorage every frame
-		var levelTimerX = cachedLevelTimerPos[0];
-		var levelTimerY = cachedLevelTimerPos[1];
-		var levelTimerScale = cachedLevelTimerScale;
-		var levelTimerAlpha = cachedLevelTimerAlpha;
-		var levelKeysX = cachedLevelKeysPos[0];
-		var levelKeysY = cachedLevelKeysPos[1];
-		var levelKeysScale = cachedLevelKeysScale;
-		var levelKeysAlpha = cachedLevelKeysAlpha;
-		if ((_keysDown[84] || (tPress = false)) && !tPress && (tPress = true)) {
-			cachedShowTimer = +!+(cachedShowTimer || 1) + '';
-			bfdia5b.setItem('timerMod.showTimer', cachedShowTimer);
-		}
-		if ((_keysDown[89] || (yPress = false)) && !yPress && (yPress = true)) {
-			cachedShowKeys = +!+(cachedShowKeys || 1) + '';
-			bfdia5b.setItem('timerMod.showKeys', cachedShowKeys);
-		}
+		var levelTimerX = parseFloat(bfdia5b.getItem('timerMod.levelTimerPos')?.split(',')[0]) || 6;
+		var levelTimerY = parseFloat(bfdia5b.getItem('timerMod.levelTimerPos')?.split(',')[1]) || 6;
+		var levelTimerScale = parseFloat(bfdia5b.getItem('timerMod.levelTimerScale')) || 0.7;
+		var levelTimerAlpha = parseFloat(bfdia5b.getItem('timerMod.levelTimerAlpha')) || 0.6;
+		var levelKeysX = parseFloat(bfdia5b.getItem('timerMod.levelKeysPos')?.split(',')[0]) || 695;
+		var levelKeysY = parseFloat(bfdia5b.getItem('timerMod.levelKeysPos')?.split(',')[1]) || 3;
+		var levelKeysScale = parseFloat(bfdia5b.getItem('timerMod.levelKeysScale')) || 0.6;
+		var levelKeysAlpha = parseFloat(bfdia5b.getItem('timerMod.levelKeysAlpha')) || 0.45;
+		if ((_keysDown[84] || (tPress = false)) && !tPress && (tPress = true)) bfdia5b.setItem('timerMod.showTimer', +!+(bfdia5b.getItem('timerMod.showTimer') || 1));
+		if ((_keysDown[89] || (yPress = false)) && !yPress && (yPress = true)) bfdia5b.setItem('timerMod.showKeys', +!+(bfdia5b.getItem('timerMod.showKeys') || 1));
 		redrawTimerTexts(
-			getTimerCached - levelTimer2, best[currentLevel] || getTimerCached - levelTimer2, timer + getTimerCached - levelTimer2,
+			toHMS(getTimer() - levelTimer2), toHMS(best[currentLevel] || getTimer() - levelTimer2), toHMS(timer + getTimer() - levelTimer2),
 			levelTimerX, levelTimerY, levelTimerScale, levelTimerAlpha
 		);
 		redrawLevelKeys(
-			getKeyMapNames(), levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha
+			[ 'z', 'r', '', '↑', '←', '↓', '→', '⏎' ],
+			levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha
 		);
 		drawLevelButtons();
 		if (menuScreen != 3) {
@@ -11347,8 +10347,6 @@ function draw() {
 	ctxReal.drawImage(canvas, 0, 0, cwidth, cheight);
 
 	_frameCount++;
-	// Update session timer display (wall-clock based); value is computed from start + accumulated time
-	try { updateSessionTimerDisplay(); } catch (e) {}
 	pmouseIsDown = mouseIsDown;
 	_pxmouse = _xmouse;
 	_pymouse = _ymouse;
@@ -11365,169 +10363,20 @@ let lastFrameReq = then;
 let interval = 1000 / fps;
 let delta;
 
-
 function rAF60fps() {
 	requestAnimationFrame(rAF60fps);
-	if (noLag) {
-		draw();
-	} else {
+	if (frameRateThrottling) {
 		now = window.performance.now();
 		delta = now - then;
 		if (delta > interval) {
 			then = now - (delta % interval);
-			for (let i = 0; i < fps/60; i++) draw();
+			draw();
 		}
 
 		// Added this line to fix unnecessary lag sometimes caused by the framerate limiter.
 		if (lastFrameReq - then > interval) then = now;
 		lastFrameReq = now;
-	}
-}
-
-function setFps(newFps) {
-	if (paused) return;
-	resetSessionTimer(); // nice try
-	noLag = false;
-	fps = newFps;
-	lastFrameReq = then;
-	interval = 1000 / fps;
-	// document.getElementById("TEMP").textContent = fps + " FPS";
-}
-
-function toggleNoLag() {
-	noLag = !noLag;
-}
-
-let paused = false;
-function togglePausePlay() {
-
-	resetSessionTimer(); // nice try
-	if (paused === false) {
-		setFps(0);
-		paused = true;
-	}
-	else { // paused  === true
-		paused = false;
-		setFps(document.getElementById('fps-slider').value * 6);
-	}
-	// document.getElementById('pause-play-btn').textContent = (paused) ? 'Play (G)' : 'Pause (G)';
-}
-
-function advanceFrame() {
-	if (!paused) return;
-	draw();
-}
-
-function toggleFastRestart() {
-	fastRestart = !fastRestart;
-	document.getElementById('fast-restart-btn').textContent = (fastRestart) ? 'Disable fast restart' : 'Enable fast restart';
-}
- 
-function toggleStayInLevel() {
-	stayInLevel = !stayInLevel;
-	document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave level after finish' : 'Stay in level after finish';
-}
-
-function toggleSpeedrunPracticeMode() {
-	if (!speedrunPracticeMode) {
-		levelHasBeenSaved = false;
-
-		if (fastRestart) toggleFastRestart();
-		setFps(60);
-		if (stayInLevel) toggleStayInLevel();
-
-		for (let i = 0; i < speedrunPracticeBtns.length; i++) {
-			const btn = speedrunPracticeBtns[i];
-			if (!btn) continue;
-
-			btn.disabled = true;
-			btn.setAttribute('disabled', '');
-		}
-	}
-	else {
-		// document.getElementById('TEMP').textContent = 'enabling...';
-		for (let i = 0; i < speedrunPracticeBtns.length; i++) {
-			const btn = speedrunPracticeBtns[i];
-			if (!btn) continue;
-
-			btn.disabled = false;
-			btn.removeAttribute('disabled');
-		}
-	}
-}
-
-let charBackups = new Array(1); // characters
-let levelTimerBackup = 0; // things like cycles of moving objects
-let thisLevelBackup = null; // things like whether a lever/button is active or not
-let tileFramesBackup = null; // things like lever and button positions
-let controlBackup = 0; // which character is being controlled
-let recoverTimerBackup = 0; // death fade-out
-let recoverBackup = false;
-let recover2Backup = 0;
-
-let levelHasBeenSaved = false; // check for whether a load is valid here or not
-function saveState() {
-	document.getElementById('TEMP').textContent = char[0].y; // debug
-	charBackups = new Array(charCount);
-	for (let i = 0; i < charCount; i++) {
-		// make a clone of the characters 
-		// ("structuredClone" makes a deep copy, which we need so state doesn't get overwritten)
-		charBackups[i] = structuredClone(char[i]);
-	}
-	// Save current level timer so time-based motion resumes at the same phase when the state is loaded.
-	// This will allow the moving object cycles to be in the same place when loaded
-	levelTimerBackup = structuredClone(levelTimer);
-
-	// Save current level tile state so lever/switch positions don't persist across loads
-	thisLevelBackup = structuredClone(thisLevel);
-
-	// Save control/recover timer so control returns to the saved character after loading
-	controlBackup = structuredClone(control);
-	recoverTimerBackup = structuredClone(recoverTimer);
-
-	levelHasBeenSaved = true;
-
-	// save tile states
-	tileFramesBackup = structuredClone(tileFrames);
-
-	recoverBackup = structuredClone(recover);
-	recover2Backup = structuredClone(recover2);
-}
-
-function loadState() {
-	if (!levelHasBeenSaved) return;
-
-	levelTimer = levelTimerBackup;
-
-	// If we have a saved level layout (thisLevelBackup), restore it and rebuild
-	// dependent structures (tileFrames, tileDepths, shadows, static tile canvas).
-	if (thisLevelBackup) {
-		// Rebuild thisLevel and tile-related arrays from the backup.
-		copyLevel(thisLevelBackup);
-		tileDepths = [[], [], [], []];
-		getTileDepths();
-		calculateShadowsAndBorders();
-		drawStaticTiles();
-	}
-
-	// restore the tile states
-	tileFrames = tileFramesBackup;
-
-	// Restore characters from their backups
-	for (let i = 0; i < charCount; i++) {
-		char[i].setVars(charBackups[i]);
-		// Clear stoodOnBy arrays since they need to be recalculated by physics in the next frame
-		char[i].stoodOnBy = [];
-	}
-
-	// Restore control and recover timer so the saved player regains input
-	if (typeof controlBackup !== 'undefined') control = controlBackup;
-	if (typeof recoverTimerBackup !== 'undefined') recoverTimer = recoverTimerBackup;
-
-	// advance to next frame so that we can actually see the load happen
-	advanceFrame();
-
-	resetSessionTimer();
+	} else draw();
 }
 
 // Explore API Stuff
@@ -11668,7 +10517,7 @@ function logInExplore() {
 			clearInterval(closedPoller);
 			getCurrentExploreUserID();
 		}
-	}, 500);
+	  }, 500);
 }
 
 function logOutExplore() {
@@ -11838,20 +10687,6 @@ class Character {
 
 	jump(jumpPower) {
 		this.vy = jumpPower;
-		// Play jump sound as a cloned node so multiple jumps can overlap.
-		try {
-			if (jumpSound) {
-				const s = jumpSound.cloneNode(true);
-				// ensure start at beginning
-				try { s.currentTime = 0; } catch (e) {}
-				// play and ignore promise rejection (autoplay policy may block)
-				s.play().catch(() => {});
-				// remove reference when finished to allow GC
-				s.addEventListener('ended', () => { try { if (s.parentNode) s.parentNode.removeChild(s); } catch (e) {} });
-			}
-		} catch (e) {
-			// ignore audio errors
-		}
 	}
 
 	swimUp(jumpPower) {
@@ -11864,60 +10699,6 @@ class Character {
 			this.frame = newFrame;
 			if (cutScene == 3 && this.expr != this.dExpr) this.expr = this.dExpr;
 		}
-	}
-
-	// used for savestates; takes the saved character as input and sets this one's vars to that one's
-	setVars(savedData) {
-		this.id = savedData.id;
-		this.x = savedData.x;
-		this.y = savedData.y;
-		this.px = savedData.px;
-		this.py = savedData.py;
-		this.vx = savedData.vx;
-		this.vy = savedData.vy;
-		this.onob = savedData.onob;
-		this.dire = savedData.dire;
-		this.carry = savedData.carry;
-		this.carryObject = savedData.carryObject;
-		this.carriedBy = savedData.carriedBy;
-		this.landTimer = savedData.landTimer;
-		this.deathTimer = savedData.deathTimer;
-		this.charState = savedData.charState;
-		this.standingOn = savedData.standingOn;
-		this.stoodOnBy = savedData.stoodOnBy
-		this.w = savedData.w;
-		this.h = savedData.h;
-		this.weight = savedData.weight;
-		this.weight2 = savedData.weight2;
-		this.h2 = savedData.h2;
-		this.atEnd = savedData.atEnd;
-		this.friction = savedData.friction;
-		this.fricGoal = savedData.fricGoal;
-		this.justChanged = savedData.justChanged;
-		this.speed = savedData.speed;
-		this.motionString = savedData.motionString
-		this.buttonsPressed = savedData.buttonsPressed
-		this.pcharState = savedData.pcharState;
-		this.submerged = savedData.submerged;
-		this.temp = savedData.temp;
-		this.heated = savedData.heated;
-		this.heatSpeed = savedData.heatSpeed;
-		this.hasArms = savedData.hasArms;
-
-		this.frame = savedData.frame;
-		this.poseTimer = savedData.poseTimer;
-		this.leg1frame = savedData.leg1frame;
-		this.leg2frame = savedData.leg2frame;
-		this.leg1skew = savedData.leg1skew;
-		this.leg2skew = savedData.leg2skew;
-		this.legdire = savedData.legdire;
-		this.legAnimationFrame = savedData.legAnimationFrame; // Animation offset.
-		this.burstFrame = savedData.burstFrame;
-		this.diaMouthFrame = savedData.diaMouthFrame;
-		this.expr = savedData.expr;
-		this.dExpr = savedData.dExpr;
-		this.acidDropTimer = savedData.acidDropTimer;
-		document.getElementById('TEMP').textContent = savedData.y;
 	}
 }
 
@@ -12176,10 +10957,3 @@ function deselectAllTextBoxes() {
 	}
 	canvas.setAttribute('contenteditable', false);
 }
-
-// THINGS THAT NEED TO BE DUPLICATED FOR ANOTHER SAVE FILE [WIP]:
-// -levelProgress
-// -best completion data
-// -prev completion data
-// -death count
-// -WT count

@@ -1,18 +1,20 @@
 THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
-1) Improve overall performance (this mod is significantly laggier than the original timermod)
-2) Make a vertical Livesplit layout
-3) Add losing/gaining time colors in Livesplit
-4) Fix stay-after-finish displaying final time as one frame too long
-5) Fix stay-after-finish positions resetting before wipe
+1) Make a vertical Livesplit layout
+2) Add losing/gaining time colors in Livesplit
+3) Fix stay-after-finish displaying final time as one frame too long
+4) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
-01/29/25:
+02/01/26:
+-Diagnosed the massive performance issue (expensive Livesplit timer operation called three times per frame). Fixed using caching, though I may be able to come up with a more elegant solution later.
+
+01/29/26:
 -Added ability to remove the best time from a single level individually by right-clicking the level in the menu.
 -Fixed savestate bug where going straight from standing on object -> holding object causes player to rise up rapidly.
 
-01/26/25:
+01/26/26:
 -Added Delta to the Livesplit layout! Features ahead, behind, and gold splits.
 -Fixed the splits not updating properly following a reset.
 
