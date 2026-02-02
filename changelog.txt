@@ -8,7 +8,8 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
 02/01/26:
--Diagnosed the massive performance issue (expensive Livesplit timer operation called three times per frame). Fixed using caching, though I may be able to come up with a more elegant solution later.
+-Diagnosed the massive performance issue; slow Livesplit timer operations were being called once or more every single frame.
+-Added the loading screen.
 
 01/29/26:
 -Added ability to remove the best time from a single level individually by right-clicking the level in the menu.

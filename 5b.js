@@ -2338,6 +2338,7 @@ function compareFastestRun() {
 }
 
 function resetSessionTimer() {
+	if (!sessionTimerRunning) return;
 	// Update best individual splits for all levels in this run before clearing
 	let hasNew = false;
 	let improvedLevels = [];
@@ -2601,7 +2602,13 @@ function getPixelRatio(quality) {
 	return 2**(Math.round(Math.log2(window.devicePixelRatio))+quality)
 }
 
+let loadingMessages = [];
+
 async function loadingScreen() {
+	// Load loading messages first
+	const msgReq = await fetch('data/loadingMessages.json');
+	loadingMessages = await msgReq.json();
+
 	pixelRatio = getPixelRatio(0);
 
 	// Initialize Canvas Stuff
@@ -2625,11 +2632,17 @@ async function loadingScreen() {
 	ctx.fillStyle = '#245A98';
 	ctx.fillRect(0, 0, cwidth, cheight);
 	// Text
-	ctx.fillStyle = '#000000';
+	ctx.fillStyle = '#FFFFFF';
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
 	ctx.font = '30px Helvetica';
-	ctx.fillText('Loading...', cwidth / 2, cheight / 2);
+	
+	// Choose loading message: 50% chance of alternate, 50% chance of "Loading..."
+	const loadingMessage = Math.random() < 0.5 ? 'Loading...' : loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+	ctx.fillText(loadingMessage, cwidth / 2, cheight / 2);
+
+	// Display the loading screen
+	ctxReal.drawImage(canvas, 0, 0, cwidth, cheight);
 
 	let req = await fetch('data/levels.txt');
 	levelsString = await req.text();
@@ -8794,6 +8807,8 @@ function draw() {
 					// if (currentLevel === 2) {
 						stopSessionTimer();
 					}
+
+					console.log("HI")
 					
 					// Auto-scroll livesplit entries one entry to the right so the newly-completed
 					// split becomes visible. This is guarded so it won't throw if the DOM
@@ -11352,8 +11367,8 @@ function draw() {
 	ctxReal.drawImage(canvas, 0, 0, cwidth, cheight);
 
 	_frameCount++;
-	// Update session timer display (wall-clock based); value is computed from start + accumulated time
-	try { updateSessionTimerDisplay(); } catch (e) {}
+	// Update session timer display
+	if (sessionTimerRunning) updateSessionTimerDisplay();
 	pmouseIsDown = mouseIsDown;
 	_pxmouse = _xmouse;
 	_pymouse = _ymouse;
@@ -11427,7 +11442,7 @@ function toggleFastRestart() {
 	fastRestart = !fastRestart;
 	document.getElementById('fast-restart-btn').textContent = (fastRestart) ? 'Disable fast restart' : 'Enable fast restart';
 }
- 
+
 function toggleStayInLevel() {
 	stayInLevel = !stayInLevel;
 	document.getElementById('toggle-stay-btn').textContent = (stayInLevel) ? 'Leave level after finish' : 'Stay in level after finish';
@@ -11528,6 +11543,13 @@ function loadState() {
 	// Restore control and recover timer so the saved player regains input
 	if (typeof controlBackup !== 'undefined') control = controlBackup;
 	if (typeof recoverTimerBackup !== 'undefined') recoverTimer = recoverTimerBackup;
+
+	// Recalculate charsAtEnd based on restored character states (and update the lights)
+	charsAtEnd = 0;
+	for (let i = 0; i < charCount; i++) {
+		if (char[i].atEnd) charsAtEnd++;
+		doorLightFade[i] = (i < charsAtEnd) ? 1 : 0;
+	}
 
 	// advance to next frame so that we can actually see the load happen
 	advanceFrame();
