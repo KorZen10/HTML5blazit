@@ -3,9 +3,12 @@ THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 1) Make a vertical Livesplit layout
 2) Add losing/gaining time colors in Livesplit
-3) Fix stay-after-finish displaying final time as one frame too long
-4) Fix stay-after-finish positions resetting before wipe
+3) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
+
+02/03/26:
+-Added Fixed stay-after-finish time being a frame too long; made the time's color blue to distinguish it from previous version
+-Input display pressed keys are now white instead of blue so they're easier to see
 
 02/01/26:
 -Diagnosed the massive performance issue; slow Livesplit timer operations were being called once or more every single frame.
