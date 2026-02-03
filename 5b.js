@@ -2638,103 +2638,109 @@ async function loadingScreen() {
 	ctx.font = '30px Helvetica';
 	
 	// Choose loading message: 50% chance of alternate, 50% chance of "Loading..."
-	const loadingMessage = Math.random() < 0.5 ? 'Loading...' : loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+	let loadingMessage = Math.random() < 0.5 ? 'Loading...' : loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
 	ctx.fillText(loadingMessage, cwidth / 2, cheight / 2);
 
 	// Display the loading screen
 	ctxReal.drawImage(canvas, 0, 0, cwidth, cheight);
 
-	let req = await fetch('data/levels.txt');
-	levelsString = await req.text();
-	loadLevels();
+	try {
+		let req = await fetch('data/levels.txt');
+		levelsString = await req.text();
+		loadLevels();
 
-	req = await fetch('data/images6.json');
-	let resourceData = await req.json();
+		req = await fetch('data/images6.json');
+		let resourceData = await req.json();
 
-	svgCSBubble = await createImage(resourceData['ui/csbubble/dia.svg']);
-	svgHPRCCrank = await createImage(resourceData['entities/e0035crank.svg']);
-	svgCoin = await createImage(resourceData['wintoken.svg']);
-	svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
-	svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
-	for (let i = 0; i < imgBgs.length; i++) {
-		imgBgs[i] = await createImage(resourceData['bg/bg' + i.toString().padStart(4, '0') + '.png']);
-	}
-	for (let i = 0; i < blockProperties.length; i++) {
-		let id = i.toString().padStart(4, '0');
-		if (blockProperties[i][16] == 1 || (blockProperties[i][15] && blockProperties[i][16] == 0)) {
-			svgTiles[i] = await createImage(resourceData['blocks/b' + id + '.svg']);
-			svgTilesVB[i] = getVB(resourceData['blocks/b' + id + '.svg']);
-		} else if (blockProperties[i][16] > 1) {
-			svgTiles[i] = new Array(blockProperties[i][16]);
-			svgTilesVB[i] = new Array(blockProperties[i][16]);
-			for (let j = 0; j < svgTiles[i].length; j++) {
-				svgTiles[i][j] = await createImage(
-					resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
-				);
-				svgTilesVB[i][j] = getVB(resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
+		svgCSBubble = await createImage(resourceData['ui/csbubble/dia.svg']);
+		svgHPRCCrank = await createImage(resourceData['entities/e0035crank.svg']);
+		svgCoin = await createImage(resourceData['wintoken.svg']);
+		svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
+		svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
+		for (let i = 0; i < imgBgs.length; i++) {
+			imgBgs[i] = await createImage(resourceData['bg/bg' + i.toString().padStart(4, '0') + '.png']);
+		}
+		for (let i = 0; i < blockProperties.length; i++) {
+			let id = i.toString().padStart(4, '0');
+			if (blockProperties[i][16] == 1 || (blockProperties[i][15] && blockProperties[i][16] == 0)) {
+				svgTiles[i] = await createImage(resourceData['blocks/b' + id + '.svg']);
+				svgTilesVB[i] = getVB(resourceData['blocks/b' + id + '.svg']);
+			} else if (blockProperties[i][16] > 1) {
+				svgTiles[i] = new Array(blockProperties[i][16]);
+				svgTilesVB[i] = new Array(blockProperties[i][16]);
+				for (let j = 0; j < svgTiles[i].length; j++) {
+					svgTiles[i][j] = await createImage(
+						resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
+					);
+					svgTilesVB[i][j] = getVB(resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
+				}
 			}
 		}
-	}
-	for (let i = 0; i < svgLevers.length; i++) {
-		svgLevers[i] = await createImage(resourceData['blocks/b' + i.toString().padStart(2, '0') + 'lever.svg']);
-	}
-	for (let i = 0; i < svgShadows.length; i++) {
-		svgShadows[i] = await createImage(resourceData['shadows/s' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgTileBorders.length; i++) {
-		svgTileBorders[i] = await createImage(resourceData['borders/tb' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < charD.length; i++) {
-		let id = i.toString().padStart(4, '0');
-		if (charD[i][7] < 1) continue;
-		else if (charD[i][7] == 1) {
-			svgChars[i] = await createImage(resourceData['entities/e' + id + '.svg']);
-			svgCharsVB[i] = getVB(resourceData['entities/e' + id + '.svg']);
-		} else {
-			svgChars[i] = new Array(charD[i][7]);
-			svgCharsVB[i] = new Array(charD[i][7]);
-			for (let j = 0; j < svgChars[i].length; j++) {
-				svgChars[i][j] = await createImage(
-					resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
-				);
-				svgCharsVB[i][j] = getVB(resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
+		for (let i = 0; i < svgLevers.length; i++) {
+			svgLevers[i] = await createImage(resourceData['blocks/b' + i.toString().padStart(2, '0') + 'lever.svg']);
+		}
+		for (let i = 0; i < svgShadows.length; i++) {
+			svgShadows[i] = await createImage(resourceData['shadows/s' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgTileBorders.length; i++) {
+			svgTileBorders[i] = await createImage(resourceData['borders/tb' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < charD.length; i++) {
+			let id = i.toString().padStart(4, '0');
+			if (charD[i][7] < 1) continue;
+			else if (charD[i][7] == 1) {
+				svgChars[i] = await createImage(resourceData['entities/e' + id + '.svg']);
+				svgCharsVB[i] = getVB(resourceData['entities/e' + id + '.svg']);
+			} else {
+				svgChars[i] = new Array(charD[i][7]);
+				svgCharsVB[i] = new Array(charD[i][7]);
+				for (let j = 0; j < svgChars[i].length; j++) {
+					svgChars[i][j] = await createImage(
+						resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
+					);
+					svgCharsVB[i][j] = getVB(resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
+				}
 			}
 		}
-	}
-	for (let i = 0; i < svgBodyParts.length; i++) {
-		svgBodyParts[i] = await createImage(resourceData['bodyparts/bp' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgHPRCBubble.length; i++) {
-		svgHPRCBubble[i] = await createImage(
-			resourceData['ui/hprcbubble/hprcbubble' + i.toString().padStart(4, '0') + '.svg']
-		);
-	}
-	for (let i = 0; i < svgCoinGet.length; i++) {
-		svgCoinGet[i] = await createImage(resourceData['effects/wtgetf' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgFire.length; i++) {
-		svgFire[i] = await createImage(resourceData['effects/fire' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgBurst.length; i++) {
-		svgBurst[i] = await createImage(resourceData['effects/burst' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgAcidDrop.length; i++) {
-		svgAcidDrop[i] = await createImage(resourceData['effects/aciddrop' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	svgMenu0 = await createImage(resourceData['menu0.svg']);
-	svgMenu2 = await createImage(resourceData['menu2.svg']);
-	svgMenu6 = await createImage(resourceData['menu6.svg']);
-	svgMenu2border = await createImage(resourceData['menu2border.svg']);
-	svgMenu2borderimg = await createImage(resourceData['menu2borderimg.png']);
-	preMenuBG = await createImage(resourceData['premenubg.png']);
-	for (let i = 0; i < svgTools.length; i++) {
-		svgTools[i] = await createImage(resourceData['lc/tool' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgMyLevelsIcons.length; i++) {
-		svgMyLevelsIcons[i] = await createImage(resourceData['ui/mylevels/icon' + i.toString().padStart(4, '0') + '.svg']);
-		// console.log(resourceData['ui/mylevels/icon' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	setup();
+		for (let i = 0; i < svgBodyParts.length; i++) {
+			svgBodyParts[i] = await createImage(resourceData['bodyparts/bp' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgHPRCBubble.length; i++) {
+			svgHPRCBubble[i] = await createImage(
+				resourceData['ui/hprcbubble/hprcbubble' + i.toString().padStart(4, '0') + '.svg']
+			);
+		}
+		for (let i = 0; i < svgCoinGet.length; i++) {
+			svgCoinGet[i] = await createImage(resourceData['effects/wtgetf' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgFire.length; i++) {
+			svgFire[i] = await createImage(resourceData['effects/fire' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgBurst.length; i++) {
+			svgBurst[i] = await createImage(resourceData['effects/burst' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgAcidDrop.length; i++) {
+			svgAcidDrop[i] = await createImage(resourceData['effects/aciddrop' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		svgMenu0 = await createImage(resourceData['menu0.svg']);
+		svgMenu2 = await createImage(resourceData['menu2.svg']);
+		svgMenu6 = await createImage(resourceData['menu6.svg']);
+		svgMenu2border = await createImage(resourceData['menu2border.svg']);
+		svgMenu2borderimg = await createImage(resourceData['menu2borderimg.png']);
+		preMenuBG = await createImage(resourceData['premenubg.png']);
+		for (let i = 0; i < svgTools.length; i++) {
+			svgTools[i] = await createImage(resourceData['lc/tool' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgMyLevelsIcons.length; i++) {
+			svgMyLevelsIcons[i] = await createImage(resourceData['ui/mylevels/icon' + i.toString().padStart(4, '0') + '.svg']);
+			// console.log(resourceData['ui/mylevels/icon' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		setup();
+	} catch (e) {
+		loadingMessage = "[please reload the page]";
+		ctx.fillText(loadingMessage, cwidth / 2, cheight / 2);
+		ctxReal.drawImage(canvas, 0, 0, cwidth, cheight);
+	}	
 }
 
 window.onload = function () {
@@ -3180,7 +3186,7 @@ function setQual() {
 function exitLevel() {
 	// turn off ability to lead savestate so game won't crash
 	levelHasBeenSaved = false;
-
+	inLayoutEditor = false;
 	menuScreen = 2;
 }
 
@@ -3277,6 +3283,7 @@ function drawMenu2_3Button(id, x, y, action) {
 var exitedLevelTime;
 var clearTime = 10000;
 let resetBestTimeID = -1;
+let effectiveTimerMs;
 function drawLevelButton(text, x, y, id, color) {
 	let fill = '#585858';
 	let newText;
@@ -3592,7 +3599,9 @@ let _cachedBestMs = null;
 let _cachedTotalStr = null;
 let _cachedTotalMs = null;
 
+let inLayoutEditor = false;
 function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha = 0.6) {
+	// console.log("timer:", timer, "best:", best, "total:", total);
 	if (cachedShowTimer == '0') return;
 	ctx.fillStyle = '#ffffff';
 	ctx.textAlign = 'left';
@@ -3605,7 +3614,7 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 
 	// Cache formatted strings and only regenerate when values change
 	let displayTimerStr;
-	if (_cachedTimerMs !== timer) {
+	if (!inLayoutEditor && _cachedTimerMs !== timer) {
 		_cachedTimerMs = timer;
 		_cachedTimerStr = toHMS(timer);
 	}
@@ -3616,8 +3625,8 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 
 	if (frozen) {
 		if (typeof redrawTimerTexts._frozenTimerMs === 'undefined') {
-			// Capture the current frame-based level time (ms) at the moment of freeze
-			redrawTimerTexts._frozenTimerMs = timer;
+			// Subtract one frame to account for the frame delay in capture (to match best time capture)
+			redrawTimerTexts._frozenTimerMs = timer - (1000 / 60);
 		}
 		if (redrawTimerTexts._frozenTimerMs !== null && !isNaN(redrawTimerTexts._frozenTimerMs)) {
 			displayTimerStr = toHMS(redrawTimerTexts._frozenTimerMs);
@@ -3628,21 +3637,26 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 	}
 
 	// Color the primary timer green if stay-timer active, otherwise white
-	ctx.fillStyle = stayTimerActive ? '#44FF44' : '#ffffff';
+	ctx.fillStyle = stayTimerActive ? /*'#44FF44'*/ '#00DDFF' : '#ffffff';
 	ctx.fillText(displayTimerStr, x + 80 * scale, y);
 
 	// Cache best and total strings
-	if (_cachedBestMs !== best) {
+	if (!inLayoutEditor && _cachedBestMs !== best) {
 		_cachedBestMs = best;
 		_cachedBestStr = toHMS(best);
 	}
-	if (_cachedTotalMs !== total) {
+	if (!inLayoutEditor && _cachedTotalMs !== total) {
 		_cachedTotalMs = total;
 		_cachedTotalStr = toHMS(total);
 	}
 
-	// Draw best/total in default (white) color
-	ctx.fillStyle = '#ffffff';
+	// Draw best/total — color best green if the current/frozen timer is strictly lower
+	if (!isNaN(effectiveTimerMs) && !isNaN(best) && effectiveTimerMs < best) {
+		ctx.fillStyle = '#44FF44';
+	}
+	else {
+		ctx.fillStyle = '#ffffff';
+	}
 	ctx.fillText(_cachedBestStr, x + 80 * scale, y + 34 * scale);
 	ctx.fillText(_cachedTotalStr, x + 80 * scale, y + 34 * 2 * scale);
 	ctx.globalAlpha = 1;
@@ -3679,15 +3693,16 @@ function getKeyCoordinateMatrix() {
 	cachedKeyMatrix = matrix;
 	return matrix;
 }
+
 function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
 	if (cachedShowKeys == '0') return;
 	
 	const keyCoordinateMatrix = getKeyCoordinateMatrix();
-	ctx.globalAlpha = alpha;
+	ctx.globalAlpha = 0.8;
 	for (var key of Object.keys(keyCoordinateMatrix)) {
-		ctx.fillStyle = _keysDown[key] ? '#0033CC' : '#666666';
+		ctx.fillStyle = _keysDown[key] ? /*'#0033CC'*/ '#FFFFFF' : '#666666';
 		// Shift+Enter also highlights the talk key
-		if (key == _keysDown[13] && _keysDown[16]) ctx.fillStyle = '#0033CC';
+		if (key == _keysDown[13] && _keysDown[16]) ctx.fillStyle = '#FFFFFF';
 		var coords = keyCoordinateMatrix[key];
 		for (var coord of coords) ctx.fillRect(x + coord[0] * scale, y + coord[1] * scale, coord[2] * scale, coord[3] * scale);
 	}
@@ -3716,6 +3731,7 @@ var levelTimerOffset, levelKeysOffset;
 var lastHover = 't';
 var tPress = false, yPress = false;
 function runLayoutEditor() {
+	inLayoutEditor = true;
 	ctx.fillStyle = '#245A98';
 	ctx.fillRect(0, 0, cwidth, cheight);
 	currentLevelDisplayName = 'Drag to organize; R to reset';
@@ -11549,6 +11565,7 @@ function loadState() {
 	for (let i = 0; i < charCount; i++) {
 		if (char[i].atEnd) charsAtEnd++;
 		doorLightFade[i] = (i < charsAtEnd) ? 1 : 0;
+		doorLightFadeDire[i] = 0;
 	}
 
 	// advance to next frame so that we can actually see the load happen

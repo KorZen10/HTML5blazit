@@ -27,7 +27,7 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 -Renamed HTML5bozo to HTML5blazit
 
 11/30/25:
--Implemented most of the "Stay After Finish" feature, which allows the player to stay in a level after completing it if they click the "Stay After Fiish" button. This is useful as it allows them to see their completion time while still being in the level to make resetting for more individual level attempts more efficient. This can be toggled using a button in the same row as all other speedrun mod features. But it isn't perfect; after a level completion and a reset, the characters' positions are updated before the wipe completes, which is a bug, but it doesn't actually hinder gameplay as their positions reset again following the wipe. It also isn't even visible if fast reset is turned on. This feature IS allowed in official speedruns.
+-Implemented most of the "Stay After Finish" feature, which allows the player to stay in a level after completing it if they click the "Stay After Finish" button. This is useful as it allows them to see their completion time while still being in the level to make resetting for more individual level attempts more efficient. This can be toggled using a button in the same row as all other speedrun mod features. But it isn't perfect; after a level completion and a reset, the characters' positions are updated before the wipe completes, which is a bug, but it doesn't actually hinder gameplay as their positions reset again following the wipe. It also isn't even visible if fast reset is turned on. This feature IS allowed in official speedruns.
 
 11/27/25: Fixed the lever positions not updating when loading to a savestate. Made the speedrun mod buttons look a little bit less ugly.
 
