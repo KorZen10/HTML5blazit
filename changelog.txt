@@ -6,6 +6,10 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 3) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
+02/05/26:
+-Added ability to change the color of keys in the input display when they are pressed
+-Found and fixed another big performance sink (buttons in menu select were still being run every frame even during gameplay)
+
 02/03/26:
 -Added Fixed stay-after-finish time being a frame too long; made the time's color blue to distinguish it from previous version
 -Input display pressed keys are now white instead of blue so they're easier to see

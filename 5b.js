@@ -2321,7 +2321,6 @@ function stopSessionTimer() {
 }
 
 function compareFastestRun() {	
-	console.log("here")
 	if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
 		// New fastest run!
 		fastestRunTime = sessionTimerAccum;
@@ -3285,6 +3284,7 @@ var clearTime = 10000;
 let resetBestTimeID = -1;
 let effectiveTimerMs;
 function drawLevelButton(text, x, y, id, color) {
+	if (menuScreen == 3) return;
 	let fill = '#585858';
 	let newText;
 	let mouseHover = onRect(_xmouse, _ymouse + cameraY, x, y, levelButtonSize.w, levelButtonSize.h) && (_xmouse < 587 || _ymouse < 469);
@@ -3694,21 +3694,30 @@ function getKeyCoordinateMatrix() {
 	return matrix;
 }
 
+// Colors to use when a key is pressed. White first, then rainbow.
+const KEY_PRESS_COLOR_LIST = ['#FFFFFF','#FF0000','#FF7F00','#FFFF00','#00FF00','#00FFFF','#0066FF','#8F44FF'];
+
 function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
 	if (cachedShowKeys == '0') return;
 	
+	// determine current pressed-key color index from storage (runLayoutEditor keeps it in-range)
+	let keyColorIndex = parseInt(bfdia5b.getItem('timerMod.keyColorIndex'));
+	if (isNaN(keyColorIndex)) keyColorIndex = 0;
+	const pressedColor = KEY_PRESS_COLOR_LIST[keyColorIndex];
+
 	const keyCoordinateMatrix = getKeyCoordinateMatrix();
 	ctx.globalAlpha = 0.8;
 	for (var key of Object.keys(keyCoordinateMatrix)) {
-		ctx.fillStyle = _keysDown[key] ? /*'#0033CC'*/ '#FFFFFF' : '#666666';
+		ctx.fillStyle = _keysDown[key] ? pressedColor : '#666666';
 		// Shift+Enter also highlights the talk key
-		if (key == _keysDown[13] && _keysDown[16]) ctx.fillStyle = '#FFFFFF';
+		if (key == _keysDown[13] && _keysDown[16]) ctx.fillStyle = pressedColor;
 		var coords = keyCoordinateMatrix[key];
 		for (var coord of coords) ctx.fillRect(x + coord[0] * scale, y + coord[1] * scale, coord[2] * scale, coord[3] * scale);
 	}
 	ctx.fillStyle = '#000000';
 	ctx.textAlign = 'center';
 	ctx.font = `${32 * scale}px Helvetica`;
+
 	// keys array order matches keyMapNames: [jump(⎵), switch(z), reset(r), [empty], grab(↑), left(←), drop(↓), right(→), grabExtra, talk(⏎)]
 	// Visual positions: switch, reset, jump, grab(up), left, drop(down), right, talk, grabExtra
 	ctx.fillText(keys[1] || '', x + 13.35 * scale + 53.15/2 * scale, y + 26.00 * scale); // switch
@@ -3722,14 +3731,14 @@ function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
 	// grabExtra - smaller font size
 	const prevFont = ctx.font;
 	ctx.font = `${24 * scale}px Helvetica`;
-	ctx.fillText(keys[9] || '', x + 305.00 * scale + 48.00/2 * scale, y + 27.75 * scale); // grabExtra (smaller)
+	ctx.fillText((keys[4] && keys[9] && keys[4] === keys[9]) ? '' : (keys[9] || ''), x + 305.00 * scale + 48.00/2 * scale, y + 27.75 * scale);
 	ctx.font = prevFont;
 	ctx.globalAlpha = 1;
 }
 
 var levelTimerOffset, levelKeysOffset;
 var lastHover = 't';
-var tPress = false, yPress = false;
+var tPress = false, yPress = false, uPress = false, iPress = false;
 function runLayoutEditor() {
 	inLayoutEditor = true;
 	ctx.fillStyle = '#245A98';
@@ -3758,6 +3767,20 @@ function runLayoutEditor() {
 	}
 	if ((_keysDown[84] || (tPress = false)) && !tPress && (tPress = true)) bfdia5b.setItem('timerMod.showTimer', +!+(bfdia5b.getItem('timerMod.showTimer') || 1));
 	if ((_keysDown[89] || (yPress = false)) && !yPress && (yPress = true)) bfdia5b.setItem('timerMod.showKeys', +!+(bfdia5b.getItem('timerMod.showKeys') || 1));
+
+	// Cycle pressed-key display color (U = previous, I = next)
+	if ((_keysDown[85] || (iPress = false)) && !iPress && (iPress = true)) {
+		let idx = parseInt(bfdia5b.getItem('timerMod.keyColorIndex'));
+		if (isNaN(idx)) idx = 0;
+		idx = (idx - 1 + KEY_PRESS_COLOR_LIST.length) % KEY_PRESS_COLOR_LIST.length;
+		bfdia5b.setItem('timerMod.keyColorIndex', idx);
+	}
+	if ((_keysDown[73] || (uPress = false)) && !uPress && (uPress = true)) {
+		let idx = parseInt(bfdia5b.getItem('timerMod.keyColorIndex'));
+		if (isNaN(idx)) idx = 0;
+		idx = (idx + 1) % KEY_PRESS_COLOR_LIST.length;
+		bfdia5b.setItem('timerMod.keyColorIndex', idx);
+	}
 
 	var levelTimerX = parseFloat(bfdia5b.getItem('timerMod.levelTimerPos')?.split(',')[0]) || 6;
 	var levelTimerY = parseFloat(bfdia5b.getItem('timerMod.levelTimerPos')?.split(',')[1]) || 6;
@@ -3807,7 +3830,7 @@ function runLayoutEditor() {
 			levelKeysY = _ymouse - levelKeysOffset[1] * levelKeysScale;
 		} else levelKeysOffset = draggingScrollbar = false;
 	}
-	redrawLevelKeys([ '', '', '[Y to hide]', '', '', '', '', '' ], levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha * (keysHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
+	redrawLevelKeys([ '[Y to hide]', '', '', '', '', '', '[U/I for colors]', '' ], levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha * (keysHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
 	cachedLevelKeysPos = [levelKeysX, levelKeysY];
 	cachedLevelKeysScale = levelKeysScale;
 	cachedLevelKeysAlpha = levelKeysAlpha;
