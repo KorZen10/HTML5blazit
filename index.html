@@ -44,9 +44,18 @@
 	<div style="display: flex; justify-content: center;">
 		<button id="loadSplitsFromStorage" onclick="applyFastestRunToSession()">Load Splits from Storage</button>&nbsp;
 		<button id="clearSplitsFromStorage" onclick="if (confirm('Clear fastest run data from storage? This cannot be undone.')) {clearFastestRun();}">Clear Fastest Run Data</button>&nbsp;
+		<label for="splitCategorySelect" style="margin-left:8px; margin-right:4px; align-self:center;">Category</label>
+		<select id="splitCategorySelect" onchange="onSplitCategoryChange()" style="align-self:center;">
+			<option value="any%">Any%</option>
+			<option value="100%">100%</option>
+			<option value="booksegment">Book Segment (1–19)</option>
+			<option value="matchsegment">Match Segment (19–42)</option>
+			<option value="icecubesegment">Ice Cube Segment (42-52)</option>
+		</select>&nbsp;
 	</div>
 	<div id="center">
 		<div id="hide-contenteditable">
+			<!-- <h1 style="position: absolute; left: 50%; right: 50%;">If this doesn't go away, reload page</h1> -->
 			<canvas width="960" height="540" id="cnv" contenteditable="false"></canvas>
 		</div>
 		<div style="justify-content: center; display: flex; width: 100%">
@@ -85,7 +94,7 @@
 		<p class="bottomtext">Forked from <a href="https://github.com/imaperson1060/HTML5b/tree/timermod">imaperson</a>, which was forked from the <a href="https://github.com/coppersalts">coppersalts</a> port of the game: <a href="https://coppersalts.github.io/HTML5b">HTML5b</a></p>
 		
 		<!--document.getElementById('TEMP').textContent = -->
-		<div id="TEMP">hi</h1>
+		<!-- <div id="TEMP">hi</h1> -->
 	</div>
 </body>
 </html>

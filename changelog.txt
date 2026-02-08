@@ -6,6 +6,9 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 3) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
+02/28/26:
+-Added categories to the Livesplit timer! This allows you to save your best times in each category and switch easily between them. The autosplitter will also automatically detect when a Book, Match, or Ice Cube run starts/stops based on when you enter the dialogue region. [NOTE: saving best times/run splits might be broken right now; I haven't had time to test it. Help me test it!!]
+
 02/05/26:
 -Added ability to change the color of keys in the input display when they are pressed
 -Found and fixed another big performance sink (buttons in menu select were still being run every frame even during gameplay)

@@ -87,7 +87,18 @@ let mdao = new Array(levelCount);
 let mdao2 = 0;
 let levelProgress;
 let startLevelProgress;
-let furthestProgress = 0; // for Livesplit
+// getters and setters for furthest progress for this category; used to track if this run is the furthest yet, in which case it counts as a new PB
+function getFurthestProgress() {
+	const raw = bfdia5b.getItem(getSplitKey('furthest'));
+	if (raw === null) return 0;
+	const n = parseInt(raw, 10);
+	return Number.isNaN(n) ? 0 : n;
+}
+
+function setFurthestProgress(n) {
+	const num = Number(n) || 0;
+	bfdia5b.setItem(getSplitKey('furthest'), num.toString());
+}
 var best;
 var prev;
 let bonusProgress;
@@ -96,6 +107,63 @@ let gotCoin;
 let gotThisCoin = false;
 let levelpackProgress = {};
 const bfdia5b = window.localStorage;
+
+let categoryData = [
+	{name: 'booksegment', start: 0, end: 18},
+	{name: 'matchsegment', start: 18, end: 41},
+	{name: 'icecubesegment', start: 41, end: 51},
+	{name: 'any%', start: 0, end: 51},
+	{name: '100%', start: 0, end: 51},
+]
+// Livesplit category definitions and helpers
+function findCategoryByName(name) {
+	if (!name) return categoryData.find(c => c.name === 'any%');
+	return categoryData.find(c => c.name === name) || categoryData.find(c => c.name === 'any%');
+}
+
+// Default to the saved category id (stored as name) or the any% object
+let splitCategory = findCategoryByName(bfdia5b.getItem('splitCategory') || 'any%');
+
+function getSplitKey(base) {
+	return base + ':' + splitCategory.name;
+}
+
+function setSplitCategory(cat) {
+	// reset the run before changing the category so the splits are saved to the right place
+	resetSessionTimer();
+
+	// Accept either a name or an object
+	const catObj = typeof cat === 'string' ? findCategoryByName(cat) : cat;
+	splitCategory = catObj || findCategoryByName('any%');
+	bfdia5b.setItem('splitCategory', splitCategory.name);
+	if (document.getElementById && document.getElementById('splitCategorySelect')) {
+		try { document.getElementById('splitCategorySelect').value = splitCategory.name; } catch (e) {}
+	}
+	loadFastestRun();
+	// Rebuild entries for the selected category then refresh their contents
+	if (typeof createLivesplitEntries === 'function') createLivesplitEntries();
+	updateAllLivesplitEntries();
+}
+
+function onSplitCategoryChange() {
+	const sel = document.getElementById('splitCategorySelect');
+	if (!sel) return;
+	setSplitCategory(sel.value);
+}
+
+// Ensure the UI select reflects the saved category once DOM is ready
+window.addEventListener('DOMContentLoaded', () => {
+	const sel = document.getElementById('splitCategorySelect');
+	if (sel) sel.value = splitCategory.name;
+	// Also attach robust listener
+	if (sel && typeof sel.addEventListener === 'function') {
+		sel.addEventListener('change', () => {
+			setSplitCategory(sel.value);
+			if (typeof createLivesplitEntries === 'function') createLivesplitEntries();
+			updateAllLivesplitEntries();
+		});
+	}
+});
 let deathCount;
 let timer;
 let sessionTimerAccum = 0; // milliseconds accumulated while session has been running
@@ -103,19 +171,26 @@ let sessionTimerStartWallTime = null; // performance.now() when running, null wh
 let sessionTimerLastEntry = null; // performance.now() when entering the last level, null if not in a level
 let sessionTimerRunning = false; // Whether session timer is currently counting
 
-// Per-run split state: these are reset by `beginNewGame()`.	
-// `sessionSplitTimes[level]` === null means no split recorded yet for this run.
+// Per-run split state: these are reset by beginNewGame	
+// these track the times for the split, cumulative time, when a level was entered, and deltas
 let sessionSplitTimes = new Array(levelCount).fill(null);
-// Track cumulative times (sessionTimerAccum at each level completion) for current run
 let sessionCumulTimes = new Array(levelCount).fill(null);
-// Track entry times (wallclock performance.now() when level was completed) for current run
 let sessionEntryTimes = new Array(levelCount).fill(null);
-// Current run deltas: difference between current split and fastest split (not stored in localStorage)
 let currentRunDeltas = new Array(levelCount).fill(null);
-// Best run tracking: stores the fastest total time and its cumulative times per level
 let fastestRunTime = null; // fastest total sessionTimerAccum when run completed
-let fastestRunCumulTimes = new Array(levelCount).fill(null); // cumulative times from fastest run
-let fastestRunEntryTimes = new Array(levelCount).fill(null); // entry times (wallclock) from fastest run
+// Per-category maps: { [categoryName]: Array(levelCount) }
+let fastestRunCumulTimes = {};
+let fastestRunEntryTimes = {};
+
+function ensureCumulArrayForCurrentCategory() {
+	if (!Array.isArray(fastestRunCumulTimes[splitCategory.name])) fastestRunCumulTimes[splitCategory.name] = new Array(levelCount).fill(null);
+	return fastestRunCumulTimes[splitCategory.name];
+}
+
+function ensureEntryArrayForCurrentCategory() {
+	if (!Array.isArray(fastestRunEntryTimes[splitCategory.name])) fastestRunEntryTimes[splitCategory.name] = new Array(levelCount).fill(null);
+	return fastestRunEntryTimes[splitCategory.name];
+}
 let bestIndividualSplits = new Array(levelCount).fill(null); // best individual split times for each level
 let coins;
 let longMode = false;
@@ -283,34 +358,42 @@ function saveFastestRun() {
 	console.log("sessionCumulTimes:", sessionCumulTimes)
 	console.log("sessionEntryTimes:", sessionEntryTimes)
 
-	bfdia5b.setItem('fastestRunTime', fastestRunTime.toString());
-	bfdia5b.setItem('fastestRunCumulTimes', fastestRunCumulTimes.map(t => t === null ? 'null' : t.toString()).join(','));
-	bfdia5b.setItem('fastestRunEntryTimes', fastestRunEntryTimes.map(t => t === null ? 'null' : t.toString()).join(','));
+	bfdia5b.setItem(getSplitKey('fastestRunTime'), fastestRunTime === null ? 'null' : fastestRunTime.toString());
+	const cumulArr = ensureCumulArrayForCurrentCategory();
+	const entryArr = ensureEntryArrayForCurrentCategory();
+	bfdia5b.setItem(getSplitKey('fastestRunCumulTimes'), cumulArr.map(t => t === null ? 'null' : t.toString()).join(','));
+	bfdia5b.setItem(getSplitKey('fastestRunEntryTimes'), entryArr.map(t => t === null ? 'null' : t.toString()).join(','));
 }
 
 function saveBestIndividualSplits() {
-	bfdia5b.setItem('bestIndividualSplits', bestIndividualSplits.map(t => t === null ? 'null' : t.toString()).join(','));
+	bfdia5b.setItem(getSplitKey('bestIndividualSplits'), bestIndividualSplits.map(t => t === null ? 'null' : t.toString()).join(','));
 }
 
 function loadFastestRun() {
-	const savedTime = bfdia5b.getItem('fastestRunTime');
+	const savedTime = bfdia5b.getItem(getSplitKey('fastestRunTime'));
 	if (savedTime !== null) {
 		fastestRunTime = parseInt(savedTime, 10);
-		const savedCumuls = bfdia5b.getItem('fastestRunCumulTimes');
+		const savedCumuls = bfdia5b.getItem(getSplitKey('fastestRunCumulTimes'));
 		if (savedCumuls) {
-			fastestRunCumulTimes = savedCumuls.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
-			if (document.getElementById('TEMP') !== null) {
-				document.getElementById('TEMP').textContent = fastestRunCumulTimes[0];
-			}
+			// Store parsed cumul times into the current category map
+			fastestRunCumulTimes[splitCategory.name] = savedCumuls.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
 		}
-		const savedEntryTimes = bfdia5b.getItem('fastestRunEntryTimes');
+		const savedEntryTimes = bfdia5b.getItem(getSplitKey('fastestRunEntryTimes'));
 		if (savedEntryTimes) {
-			fastestRunEntryTimes = savedEntryTimes.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
+			// Store parsed entry times into the current category map
+			fastestRunEntryTimes[splitCategory.name] = savedEntryTimes.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
 		}
-		const savedBestIndividual = bfdia5b.getItem('bestIndividualSplits');
+		const savedBestIndividual = bfdia5b.getItem(getSplitKey('bestIndividualSplits'));
 		if (savedBestIndividual) {
 			bestIndividualSplits = savedBestIndividual.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
 		}
+	}
+	else {
+		// No saved fastest run for this category: clear in-memory fastest-run data
+		fastestRunTime = null;
+		fastestRunCumulTimes[splitCategory.name] = new Array(levelCount).fill(null);
+		fastestRunEntryTimes[splitCategory.name] = new Array(levelCount).fill(null);
+		bestIndividualSplits = new Array(levelCount).fill(null);
 	}
 }
 
@@ -2276,17 +2359,35 @@ function toHMS(i) {
 	);
 }
 
-// Format milliseconds as MM:SS.mmm (minutes total, no hours)
+// MIGHT BE AI SLOP: Lightweight formatter using lookup tables to avoid repeated allocations
+// (added this to reduce toMMSSms() calls and hopefully maybe reduce latency)
+const _mmss_seconds = (function(){
+	const a = new Array(60);
+	for (let i=0;i<60;i++) a[i] = (i<10? '0'+i : ''+i);
+	return a;
+})();
+const _mmss_msecs = (function(){
+	const a = new Array(1000);
+	for (let i=0;i<1000;i++) {
+		if (i < 10) a[i] = '00' + i;
+		else if (i < 100) a[i] = '0' + i;
+		else a[i] = '' + i;
+	}
+	return a;
+})();
+
 function toMMSSms(ms) {
 	const totalMs = Number(ms) || 0;
 	const minutes = Math.floor(totalMs / 60000);
 	const seconds = Math.floor((totalMs % 60000) / 1000);
 	const msecs = totalMs % 1000;
-	return (
-		minutes.toString().padStart(2, '0') + ':' +
-		seconds.toString().padStart(2, '0') + '.' +
-		msecs.toString().padStart(3, '0')
-	);
+	// return (
+	// 	minutes.toString().padStart(2, '0') + ':' +
+	// 	seconds.toString().padStart(2, '0') + '.' +
+	// 	msecs.toString().padStart(3, '0')
+	// );
+	const minStr = (minutes < 10) ? ('0' + minutes) : (minutes < 100 ? '' + minutes : minutes.toString());
+	return minStr + ':' + _mmss_seconds[seconds] + '.' + _mmss_msecs[msecs];
 }
 
 function updateSessionTimerDisplay() {
@@ -2297,7 +2398,7 @@ function updateSessionTimerDisplay() {
 	}
 }
 
-// Return current session timer in milliseconds (uses wall-clock so hidden tabs are accounted for)
+// Return current session timer in milliseconds (uses real-world time)
 function getSessionTimerMs() {
 	if (sessionTimerRunning && sessionTimerStartWallTime != null) {
 		return Math.round(sessionTimerAccum + (performance.now() - sessionTimerStartWallTime));
@@ -2312,10 +2413,13 @@ function startSessionTimer() {
 	}
 }
 
+let runFinished = false;
+
 function stopSessionTimer() {
 	if (sessionTimerRunning) {
 		sessionTimerAccum += performance.now() - sessionTimerStartWallTime;
 		sessionTimerRunning = false;
+		runFinished = true;
 	}
 	sessionTimerStartWallTime = null;
 }
@@ -2324,8 +2428,9 @@ function compareFastestRun() {
 	if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
 		// New fastest run!
 		fastestRunTime = sessionTimerAccum;
-		fastestRunCumulTimes = [...sessionCumulTimes]; // Copy current session cumulative times
-		fastestRunEntryTimes = sessionCumulTimes.map((cumul, i) => {
+		// Save under current category
+		fastestRunCumulTimes[splitCategory.name] = [...sessionCumulTimes]; // Copy current session cumulative times
+		fastestRunEntryTimes[splitCategory.name] = sessionCumulTimes.map((cumul, i) => {
 			if (cumul == null) return null;
 			if (i === 0) return cumul;
 			const prev = sessionCumulTimes[i-1];
@@ -2337,7 +2442,10 @@ function compareFastestRun() {
 }
 
 function resetSessionTimer() {
-	if (!sessionTimerRunning) return;
+	// console.log("getSessionTimerMs():",getSessionTimerMs())
+	console.log("here 1")
+	if (getSessionTimerMs() == 0) return;
+	console.log("here 2")
 	// Update best individual splits for all levels in this run before clearing
 	let hasNew = false;
 	let improvedLevels = [];
@@ -2351,6 +2459,7 @@ function resetSessionTimer() {
 			}
 		}
 	}
+	console.log("hasNew:", hasNew)
 	if (hasNew) saveBestIndividualSplits();
 	if (improvedLevels.length > 0) {
 		const update = confirm(`Improved best splits for level${improvedLevels.length > 1 ? 's' : ''} ${improvedLevels.map(i => i + 1).join(', ')}! Update?`);
@@ -2361,14 +2470,18 @@ function resetSessionTimer() {
 			saveBestIndividualSplits();
 		}
 	}
+	// reset the scroll to the start of the splits
+	if (document.getElementById('livesplit-entries')) document.getElementById('livesplit-entries').scrollLeft = 0;
 
 	console.log("levelProgress",levelProgress)
-	console.log("furthestProgress",furthestProgress)
+	console.log("furthestProgress", getFurthestProgress())
 	// Compare current run time to fastest run and update if faster
-	if (levelProgress == 53 || levelProgress > furthestProgress) {
-		furthestProgress = levelProgress;
+	// TODO update for large-segment categories
+	if (runFinished || levelProgress > getFurthestProgress()) {
+		setFurthestProgress(levelProgress);
 		compareFastestRun();
 	}
+	
 	
 	sessionTimerAccum = 0;
 	sessionTimerStartWallTime = null;
@@ -2381,41 +2494,44 @@ function resetSessionTimer() {
 	updateSessionTimerDisplay();
 	// Update all livesplit entries to show fastest run times when a new run starts
 	updateAllLivesplitEntries();
+
+	// run is no longer finished
+	runFinished = false;
 }
 
 function clearFastestRun() {
-	localStorage.removeItem('fastestRunTime');
-	localStorage.removeItem('fastestRunCumulTimes');
-	localStorage.removeItem('fastestRunEntryTimes');
-	localStorage.removeItem('bestIndividualSplits');
+	bfdia5b.removeItem(getSplitKey('fastestRunTime'));
+	bfdia5b.removeItem(getSplitKey('fastestRunCumulTimes'));
+	bfdia5b.removeItem(getSplitKey('fastestRunEntryTimes'));
+	bfdia5b.removeItem(getSplitKey('bestIndividualSplits'));
+	bfdia5b.removeItem(getSplitKey('furthest'));
 	fastestRunTime = null;
-	fastestRunCumulTimes.fill(null);
-	fastestRunEntryTimes.fill(null);
-	bestIndividualSplits.fill(null);
-	updateAllLivesplitEntries();
+	fastestRunCumulTimes[splitCategory.name] = new Array(levelCount).fill(null);
+	fastestRunEntryTimes[splitCategory.name] = new Array(levelCount).fill(null);
+	bestIndividualSplits = new Array(levelCount).fill(null);
+	// updateAllLivesplitEntries();
+	createLivesplitEntries();
 }
 
 function updateSplitTime(levelId) {
-	console.log("called updateSplitTime")
+	// console.log("called updateSplitTime")
 	// Update the corresponding split entry in the DOM using stored `prev`/`best` values.
 	const el = document.getElementById('split-time-' + levelId);
+	if (!el) return; // split not displayed for current category
 	// Prefer the session-run split (the duration between entering and exiting the level)
 	let value = null;
 	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
 		value = sessionSplitTimes[levelId];
-		document.getElementById('TEMP').textContent = "sessionSplitTimes:", sessionSplitTimes;
+		// document.getElementById('TEMP').textContent = "sessionSplitTimes:", sessionSplitTimes;
 	} else {
 		// Prefer explicit split (entry) times from the fastest run saved in storage.
 		// If not loaded into memory yet, try loading it.
-		if (typeof fastestRunEntryTimes === 'undefined' || (Array.isArray(fastestRunEntryTimes) && fastestRunEntryTimes.every(v => v == null))) {
+		const entryArr = ensureEntryArrayForCurrentCategory();
+		if (Array.isArray(entryArr) && entryArr.every(v => v == null)) {
 			loadFastestRun();
 		}
-		if (typeof fastestRunEntryTimes !== 'undefined' && fastestRunEntryTimes[levelId] != null) {
-			value = fastestRunEntryTimes[levelId];
-		} else if (typeof prev !== 'undefined' && prev[levelId] != undefined && prev[levelId] !== 'NaN') {
-			value = parseInt(prev[levelId], 10);
-		} else if (typeof best !== 'undefined' && best[levelId] != undefined && best[levelId] !== 'NaN') {
-			value = parseInt(best[levelId], 10);
+		if (Array.isArray(entryArr) && entryArr[levelId] != null) {
+			value = entryArr[levelId];
 		}
 	}
 	if (value != null && !isNaN(value)) {
@@ -2431,11 +2547,13 @@ function updateSplitTime(levelId) {
 		if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
 			const sessionNow = getSessionTimerMs();
 			cumulEl.textContent = sessionNow > 0 ? toMMSSms(sessionNow) : '\u2014';
-		} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[levelId] != null && fastestRunCumulTimes[levelId] > 0) {
-			// Otherwise show fastest run cumulative time (only if it's valid)
-			cumulEl.textContent = toMMSSms(fastestRunCumulTimes[levelId]);
 		} else {
-			cumulEl.textContent = '\u2014';
+			const cumulArr = ensureCumulArrayForCurrentCategory();
+			if (Array.isArray(cumulArr) && cumulArr[levelId] != null && cumulArr[levelId] > 0) {
+				cumulEl.textContent = toMMSSms(cumulArr[levelId]);
+			} else {
+				cumulEl.textContent = '\u2014';
+			}
 		}
 	}
 	
@@ -2443,8 +2561,9 @@ function updateSplitTime(levelId) {
 	const deltaEl = document.getElementById('split-delta-' + levelId);
 	if (deltaEl) {
 		let delta = null;
-		if (sessionCumulTimes[levelId] != null && fastestRunCumulTimes[levelId] != null) {
-			delta = sessionCumulTimes[levelId] - fastestRunCumulTimes[levelId];
+		const cumulArr = ensureCumulArrayForCurrentCategory();
+		if (sessionCumulTimes[levelId] != null && Array.isArray(cumulArr) && cumulArr[levelId] != null) {
+			delta = sessionCumulTimes[levelId] - cumulArr[levelId];
 		}
 		if (delta != null) {
 			const sign = delta >= 0 ? '+' : '-';
@@ -2467,21 +2586,37 @@ function updateSplitTime(levelId) {
 }
 
 function updateAllLivesplitEntries() {
+	console.log("called updateAllLivesplitEntries")
+	console.log("splitCategory:" + splitCategory)
 	// Update all livesplit entries to display the fastest run times
-	// Called when a new run starts or after loading
-	try {
-		for (let i = 0; i < levelCount; i++) {
-			updateSplitTime(i);
-		}
-	} catch (e) {
-		// ignore if DOM not ready
+	let indices = [];
+	if (splitCategory && typeof splitCategory.start === 'number' && typeof splitCategory.end === 'number') {
+		for (let i = splitCategory.start; i <= splitCategory.end; i++) indices.push(i);
+	} else {
+		for (let i = 0; i < levelCount; i++) indices.push(i);
 	}
+	// if (splitCategory === 'booksegment') {
+	// 	for (let i = 0; i < 19; i++) indices.push(i);
+	// }
+	// else if (splitCategory === 'matchsegment') {
+	// 	for (let i = 18; i < 42; i++) indices.push(i);
+	// }
+	// else if (splitCategory === 'icecubesegment') {
+	// 	for (let i = 41; i < 52; i++) indices.push(i);
+	// }
+	// else {
+	// 	for (let i = 0; i < 52; i++) indices.push(i);
+	// }
+	
+	console.log("indices:" + indices)
+	for (const i of indices) updateSplitTime(i);
 }
 
 function applyFastestRunToSession() {
 	// Copy fastest-run data into current session arrays so the UI shows them
 	// Ensure fastest-run arrays are loaded
-	if (!Array.isArray(fastestRunCumulTimes) || fastestRunCumulTimes.every(v => v == null)) {
+	const cumulArr = ensureCumulArrayForCurrentCategory();
+	if (Array.isArray(cumulArr) && cumulArr.every(v => v == null)) {
 		loadFastestRun();
 	}
 	updateAllLivesplitEntries();
@@ -3138,7 +3273,6 @@ function beginNewGame() {
 	currentRunDeltas = new Array(levelCount).fill(null);
 	levelEntryTimestamps = new Array(levelCount).fill(null);
 	// Reset livesplit scroll position to the left for a new run
-	if (document.getElementById('livesplit-entries')) document.getElementById('livesplit-entries').scrollLeft = 0;
 	resetSessionTimer();
 	clearVars();
 	saveGame();
@@ -3439,11 +3573,6 @@ function drawMenu() {
 	drawMenu0Button('CONTINUE GAME', 665.55, 393.05, levelProgress == 0, menuContGame);
 	drawMenu0Button('LEVEL CREATOR', 665.55, 437.7, false, menuLevelCreator);
 	drawMenu0Button('EXPLORE', 665.55, 482.5, false, menuExplore);
-
-	// let started = true;
-	// if (bfdia5b.data.levelProgress == undefined || bfdia5b.data.levelProgress == 0) {
-	//    started = false;
-	// }
 }
 
 function drawLevelMapBorder() {
@@ -3548,11 +3677,9 @@ function drawLevelMap() {
 	drawMenu0Button('53', 250, 129.35, false, () => { levelProgress = 52; resetSessionTimer(); }, 
 		40, 23.20
 	);
-	// drawMenu0Button('+', 300, 129.35, false, () => { levelProgress++; }, 
 	drawMenu0Button('+', 295, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; resetSessionTimer(); }, 
 		25, 23.20
 	);
-	// drawMenu0Button('-', 330, 129.35, false, () => { levelProgress--; }, 
 	drawMenu0Button('-', 325, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; resetSessionTimer(); }, 
 		25, 23.20
 	);
@@ -3561,7 +3688,7 @@ function drawLevelMap() {
 		if (!playingLevelpack && j >= 100) j += 19;
 		let color = 1;
 		if (i >= levelCount) color = 1;
-		else if (gotCoin[i]) color = 4;
+		else if (levelProgress > i && gotCoin[i]) color = 4;
 		else if (levelProgress == i) color = 2;
 		else if (levelProgress > i) color = 3;
 		// else if (i > 99 && i < bonusProgress + 100) {
@@ -3636,8 +3763,8 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 		redrawTimerTexts._frozenTimerMs = undefined;
 	}
 
-	// Color the primary timer green if stay-timer active, otherwise white
-	ctx.fillStyle = stayTimerActive ? /*'#44FF44'*/ '#00DDFF' : '#ffffff';
+	// Color the level timer blue if level is completed; otherwise white
+	ctx.fillStyle = stayTimerActive ? '#00DDFF' : '#ffffff';
 	ctx.fillText(displayTimerStr, x + 80 * scale, y);
 
 	// Cache best and total strings
@@ -3661,7 +3788,7 @@ function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha =
 	ctx.fillText(_cachedTotalStr, x + 80 * scale, y + 34 * 2 * scale);
 	ctx.globalAlpha = 1;
 }
-// this is the timer for the speedrun mod; stop session timer but remain in level and render timer green
+// this is the timer for the speedrun mod; stop session timer but remain in level and render timer blue
 function stopTimerButStay() {
 	stayTimerActive = true;
 	freezeLevelTimer = true;
@@ -4020,11 +4147,11 @@ function fitString(context, str, maxWidth) {
 }
 
 function playLevel(i) {
-	document.getElementById('TEMP').textContent = 'Playing level ' + (i + 1);
+	// document.getElementById('TEMP').textContent = 'Playing level ' + (i + 1);
 	if (i == levelProgress) playMode = 0;
 	else if (i < levelProgress) playMode = 1;
 	// Start session timer if playing level 1 and timer hasn't started yet
-	if (i === 0) {
+	if (i === 0 && (splitCategory.name === 'any%' || splitCategory.name === 'booksegment' || splitCategory.name === '100%')) {
 		startSessionTimer();
 	}
 
@@ -4043,7 +4170,7 @@ function playLevel(i) {
 }
 
 function resetLevel() {
-	document.getElementById('TEMP').textContent = 'Resetting level';
+	// document.getElementById('TEMP').textContent = 'Resetting level';
 	// when resetting/entering a level, clear any stay/beat/freeze state
 	levelBeat = false;
 	stayTimerActive = false;
@@ -4259,6 +4386,12 @@ function resetLevel() {
 
 	doorLightFade = new Array(charCount2).fill(0);
 	doorLightFadeDire = new Array(charCount2).fill(0);
+
+	// handle resetting segment runs upon resetting that level
+	if (sessionTimerRunning) {
+		if (splitCategory.name === "matchsegment" && currentLevel == 18) resetSessionTimer();
+		else if (splitCategory.name === "icecubesegment" && currentLevel == 41) resetSessionTimer();
+	}
 }
 
 function copyLevel(thatLevel) {
@@ -5525,7 +5658,7 @@ function onlyConveyorsUnder(i) {
 	}
 	return todo;
 }
-
+// 
 function startCutScene() {
 	if (cutScene == 0) {
 		if (toSeeCS) {
@@ -5538,7 +5671,9 @@ function startCutScene() {
 			}
 			displayLine(currentLevel, cutSceneLine);
 			char[control].dire = Math.ceil(char[control].dire / 2) * 2;
-		} else {
+
+		}
+		else {
 			rescue();
 			for (let i = 0; i < cLevelDialogueChar.length; i++) {
 				let p = cLevelDialogueChar[i];
@@ -5547,6 +5682,18 @@ function startCutScene() {
 			cutScene = 3;
 		}
 	}
+	
+	// Start/end run on dialogue in level 19 (index 18)
+	if (currentLevel === 18) {
+		if (splitCategory.name === 'booksegment') stopSessionTimer();
+		else if (splitCategory.name === 'matchsegment') startSessionTimer();
+	}
+	// Or start/end run on dialogue in level 42 (index 41)
+	else if (currentLevel === 41) {
+		if (splitCategory.name === 'matchsegment') stopSessionTimer();
+		else if (splitCategory.name === 'icecubesegment') startSessionTimer();
+	}
+	// else if (currentLevel === 53) // actually you don't need to handle anything lol
 }
 
 function endCutScene() {
@@ -8395,7 +8542,7 @@ function mouseup(event) {
 
 // in the case that you try to remap a key to one already in use, say no
 function compareOtherKeys(code, isGrab) {
-	document.getElementById('TEMP').textContent = (code == keyMappings.jump) ? 'true' : 'false';
+	// document.getElementById('TEMP').textContent = (code == keyMappings.jump) ? 'true' : 'false';
 	if (code == keyMappings.jump) return true;
 	else if (code == keyMappings.switch) return true;
 	else if (code == keyMappings.reset) return true;
@@ -8554,6 +8701,105 @@ function handlePaste(e) {
 	//canvas.setAttribute('contenteditable', true);
 }
 
+// Generate Livesplit entries (52) in the UI.
+// The game script can run before the DOM body is parsed (script is in <head>),
+// so defer creation until the document is ready. This avoids silently failing
+// when `#livesplit-entries` doesn't yet exist.
+function createLivesplitEntries() {
+	const splitsContainer = document.getElementById('livesplit-entries');
+	if (!splitsContainer) return;
+	// clear any existing content
+	splitsContainer.innerHTML = '';
+	// Determine which split indices to display for the current category
+	let indices = [];
+	if (splitCategory && typeof splitCategory.start === 'number' && typeof splitCategory.end === 'number') {
+		for (let i = splitCategory.start; i <= splitCategory.end; i++) indices.push(i);
+	} else {
+		for (let i = 0; i < levelCount; i++) indices.push(i);
+	}
+	// if (splitCategory === 'booksegment') {
+	// 	for (let i = 0; i < 19; i++) indices.push(i);
+	// }
+	// else if (splitCategory === 'matchsegment') {
+	// 	for (let i = 18; i < 42; i++) indices.push(i);
+	// }
+	// else if (splitCategory === 'icecubesegment') {
+	// 	for (let i = 41; i < 52; i++) indices.push(i);
+	// }
+	// else {
+	// 	for (let i = 0; i < 52; i++) indices.push(i);
+	// }
+	for (const i of indices) {
+		const entry = document.createElement('div');
+		entry.className = 'livesplit-entry';
+		entry.id = 'split-entry-' + i;
+		const name = document.createElement('div');
+		name.className = 'entry-name';
+		name.id = 'split-name-' + i;
+		// If levelName is available use it, otherwise fall back to a generic label.
+		name.textContent = 'Level ' + (i + 1) + (levelName && levelName[i] ? ': ' + levelName[i] : '');
+
+		// Container for both times on the same line
+		const timesRow = document.createElement('div');
+		timesRow.className = 'entry-times-row';
+
+		// Left side: individual split time (time for this level only)
+		const time = document.createElement('div');
+		time.className = 'entry-time';
+		time.id = 'split-time-' + i;
+		// Prefer session split (this run) if present, otherwise show fastest run, then prev/best or em dash
+		if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
+			time.textContent = toMMSSms(sessionSplitTimes[i]);
+		} else {
+			const cumulArr = ensureCumulArrayForCurrentCategory();
+			if (Array.isArray(cumulArr) && cumulArr[i] != null) {
+				// Calculate split from fastest run: cumul[i] - cumul[i-1]
+				const prevCumul = i > 0 && cumulArr[i - 1] != null ? cumulArr[i - 1] : 0;
+				const split = cumulArr[i] - prevCumul;
+				time.textContent = toMMSSms(split);
+			} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
+				time.textContent = toMMSSms(parseInt(prev[i], 10));
+			} else {
+				time.textContent = '\u2014';
+			}
+		}
+
+		// Right side: cumulative time (session timer accumulation at this point)
+		const cumulTime = document.createElement('div');
+		cumulTime.className = 'entry-cumul-time';
+		cumulTime.id = 'split-cumul-time-' + i;
+		// Show current session timer if available, otherwise show fastest run cumulative time or em dash
+		const sessionNow = typeof getSessionTimerMs === 'function' ? getSessionTimerMs() : sessionTimerAccum;
+		if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
+			cumulTime.textContent = toMMSSms(sessionNow);
+		} else {
+			const cumulArr = ensureCumulArrayForCurrentCategory();
+			if (Array.isArray(cumulArr) && cumulArr[i] != null && cumulArr[i] > 0) {
+				cumulTime.textContent = toMMSSms(cumulArr[i]);
+			} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
+				cumulTime.textContent = toMMSSms(parseInt(prev[i], 10));
+			} else {
+				cumulTime.textContent = '\u2014';
+			}
+		}
+
+		// Middle: delta between current run and fastest run
+		const delta = document.createElement('div');
+		delta.className = 'entry-delta';
+		delta.id = 'split-delta-' + i;
+		delta.textContent = ''; // Initially empty
+
+		timesRow.appendChild(time);
+		timesRow.appendChild(delta);
+		timesRow.appendChild(cumulTime);
+
+		entry.appendChild(name);
+		entry.appendChild(timesRow);
+		splitsContainer.appendChild(entry);
+		splitsContainer.onfocus="this.blur()"
+	}
+}
+
 function setup() {
 	osc1 = document.createElement('canvas');
 	osc1.width = cwidth;
@@ -8643,84 +8889,6 @@ function setup() {
 		toggleSpeedrunPracticeMode();
 	}
 
-	// Generate Livesplit entries (52) in the UI.
-	// The game script can run before the DOM body is parsed (script is in <head>),
-	// so defer creation until the document is ready. This avoids silently failing
-	// when `#livesplit-entries` doesn't yet exist.
-	function createLivesplitEntries() {
-		try {
-			const splitsContainer = document.getElementById('livesplit-entries');
-			if (!splitsContainer) return;
-			// clear any existing content
-			splitsContainer.innerHTML = '';
-			for (let i = 0; i < 52; i++) {
-				const entry = document.createElement('div');
-				entry.className = 'livesplit-entry';
-				entry.id = 'split-entry-' + i;
-				const name = document.createElement('div');
-				name.className = 'entry-name';
-				name.id = 'split-name-' + i;
-				// If levelName is available use it, otherwise fall back to a generic label.
-				name.textContent = 'Level ' + (i + 1) + (levelName && levelName[i] ? ': ' + levelName[i] : '');
-
-				// Container for both times on the same line
-				const timesRow = document.createElement('div');
-				timesRow.className = 'entry-times-row';
-
-				// Left side: individual split time (time for this level only)
-				const time = document.createElement('div');
-				time.className = 'entry-time';
-				time.id = 'split-time-' + i;
-				// Prefer session split (this run) if present, otherwise show fastest run, then prev/best or em dash
-				if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
-					time.textContent = toMMSSms(sessionSplitTimes[i]);
-				} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[i] != null) {
-					// Calculate split from fastest run: cumul[i] - cumul[i-1]
-					const prevCumul = i > 0 && fastestRunCumulTimes[i - 1] != null ? fastestRunCumulTimes[i - 1] : 0;
-					const split = fastestRunCumulTimes[i] - prevCumul;
-					time.textContent = toMMSSms(split);
-				} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
-					time.textContent = toMMSSms(parseInt(prev[i], 10));
-				} else {
-					time.textContent = '\u2014';
-				}
-
-				// Right side: cumulative time (session timer accumulation at this point)
-				const cumulTime = document.createElement('div');
-				cumulTime.className = 'entry-cumul-time';
-				cumulTime.id = 'split-cumul-time-' + i;
-				// Show current session timer if available, otherwise show fastest run cumulative time or em dash
-				const sessionNow = typeof getSessionTimerMs === 'function' ? getSessionTimerMs() : sessionTimerAccum;
-				if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
-					cumulTime.textContent = toMMSSms(sessionNow);
-				} else if (typeof fastestRunCumulTimes !== 'undefined' && fastestRunCumulTimes[i] != null && fastestRunCumulTimes[i] > 0) {
-					cumulTime.textContent = toMMSSms(fastestRunCumulTimes[i]);
-				} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
-					cumulTime.textContent = toMMSSms(parseInt(prev[i], 10));
-				} else {
-					cumulTime.textContent = '\u2014';
-				}
-
-				// Middle: delta between current run and fastest run
-				const delta = document.createElement('div');
-				delta.className = 'entry-delta';
-				delta.id = 'split-delta-' + i;
-				delta.textContent = ''; // Initially empty
-
-				timesRow.appendChild(time);
-				timesRow.appendChild(delta);
-				timesRow.appendChild(cumulTime);
-
-				entry.appendChild(name);
-				entry.appendChild(timesRow);
-				splitsContainer.appendChild(entry);
-				splitsContainer.onfocus="this.blur()"
-			}
-		} catch (e) {
-			// ignore DOM errors during setup
-		}
-	}
-
 	if (document.readyState === 'loading') {
 		window.addEventListener('DOMContentLoaded', () => {
 			createLivesplitEntries();
@@ -8798,7 +8966,7 @@ function draw() {
 			if (wipeTimer == 30 && menuScreen != 4 && charsAtEnd >= charCount2) levelBeat = true;
 
 			if (wipeTimer == 30) {
-				document.getElementById('TEMP').textContent = 'Resetting level';
+				// document.getElementById('TEMP').textContent = 'Resetting level';
 				if (transitionType == 0) {
 					// resetting preexisting level
 					// timer mod: took this OUT of quirks mode
@@ -8847,19 +9015,14 @@ function draw() {
 						stopSessionTimer();
 					}
 
-					console.log("HI")
-					
-					// Auto-scroll livesplit entries one entry to the right so the newly-completed
-					// split becomes visible. This is guarded so it won't throw if the DOM
-					// element doesn't exist (e.g., running without the UI present).
+					// Auto-scroll livesplit entries one entry to the right so the newly-completed split becomes visible
 					const container = document.getElementById('livesplit-entries');
 					if (container) {
 						const firstEntry = container.querySelector('.livesplit-entry');
-						if (firstEntry && levelProgress > 0 && sessionTimerRunning === true) {
+						if (firstEntry && levelProgress > splitCategory.start && sessionTimerRunning === true) {
 							const style = window.getComputedStyle(firstEntry);
 							const marginRight = parseFloat(style.marginRight) || 0;
 							
-							// const amount = Math.round(firstEntry.getBoundingClientRect().width + marginRight);
 							const amount = Math.round(firstEntry.getBoundingClientRect().width + 4.1);
 							if (typeof container.scrollBy === 'function') {
 								container.scrollBy({ left: amount, behavior: 'smooth' });
@@ -9171,7 +9334,7 @@ function draw() {
 								) {
 									if (Math.floor(char[i].x / 30) == x) {
 										let rot = (char[i].x - Math.floor(char[i].x / 30) * 30 - 15) * 5;
-										document.getElementById('TEMP').textContent = rot;
+										// document.getElementById('TEMP').textContent = rot;
 										if (
 											(rot < tileFrames[y][x].rotation && char[i].vx < 0) ||
 											(rot > tileFrames[y][x].rotation && char[i].vx > 0)
@@ -11526,7 +11689,7 @@ let recover2Backup = 0;
 
 let levelHasBeenSaved = false; // check for whether a load is valid here or not
 function saveState() {
-	document.getElementById('TEMP').textContent = char[0].y; // debug
+	// document.getElementById('TEMP').textContent = char[0].y;
 	charBackups = new Array(charCount);
 	for (let i = 0; i < charCount; i++) {
 		// make a clone of the characters 
@@ -11984,7 +12147,7 @@ class Character {
 		this.expr = savedData.expr;
 		this.dExpr = savedData.dExpr;
 		this.acidDropTimer = savedData.acidDropTimer;
-		document.getElementById('TEMP').textContent = savedData.y;
+		// document.getElementById('TEMP').textContent = savedData.y;
 	}
 }
 
