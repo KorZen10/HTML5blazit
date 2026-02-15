@@ -90,7 +90,7 @@ let startLevelProgress;
 // getters and setters for furthest progress for this category; used to track if this run is the furthest yet, in which case it counts as a new PB
 function getFurthestProgress() {
 	const raw = bfdia5b.getItem(getSplitKey('furthest'));
-	if (raw === null) return 0;
+	if (raw === null) return splitCategory.start;
 	const n = parseInt(raw, 10);
 	return Number.isNaN(n) ? 0 : n;
 }
@@ -352,12 +352,6 @@ getSavedGame();
 getSavedSettings();
 
 function saveFastestRun() {
-	console.log("saveFastestRun entered");
-
-	console.log("sessionSplitTimes:", sessionSplitTimes)
-	console.log("sessionCumulTimes:", sessionCumulTimes)
-	console.log("sessionEntryTimes:", sessionEntryTimes)
-
 	bfdia5b.setItem(getSplitKey('fastestRunTime'), fastestRunTime === null ? 'null' : fastestRunTime.toString());
 	const cumulArr = ensureCumulArrayForCurrentCategory();
 	const entryArr = ensureEntryArrayForCurrentCategory();
@@ -2425,27 +2419,39 @@ function stopSessionTimer() {
 }
 
 function compareFastestRun() {	
-	if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
-		// New fastest run!
-		fastestRunTime = sessionTimerAccum;
-		// Save under current category
-		fastestRunCumulTimes[splitCategory.name] = [...sessionCumulTimes]; // Copy current session cumulative times
-		fastestRunEntryTimes[splitCategory.name] = sessionCumulTimes.map((cumul, i) => {
-			if (cumul == null) return null;
-			if (i === 0) return cumul;
-			const prev = sessionCumulTimes[i-1];
-			if (prev == null) return null;
-			return cumul - prev;
-		}); // Calculate split durations
+	console.log("runFinished:", runFinished)
+	console.log("levelProgress:", levelProgress)
+	console.log("getFurthestProgress():", getFurthestProgress())
+	console.log("fastestRunTime:", fastestRunTime)
+	console.log("sessionTimerAccum:", sessionTimerAccum)
+	console.log("fastestRunTime:", fastestRunTime)
+
+	if (runFinished || levelProgress > getFurthestProgress()) {
+		console.log("entered!!!!")
+		setFurthestProgress(levelProgress);
+		
+		if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
+			console.log("new fastest run!")
+			// New fastest run!
+			if (fastestRunTime !== null) fastestRunTime = sessionTimerAccum;
+			// Save under current category
+			fastestRunCumulTimes[splitCategory.name] = [...sessionCumulTimes]; // Copy current session cumulative times
+			fastestRunEntryTimes[splitCategory.name] = sessionCumulTimes.map((cumul, i) => {
+				console.log("cumul:", cumul, "i:", i)
+				if (cumul == null) return null;
+				if (i === 0) return cumul;
+				const prev = (sessionCumulTimes[i-1] === null) ? 0 : sessionCumulTimes[i-1];
+				if (prev == null) return null;
+				return cumul - prev;
+			}); // Calculate split durations
 		saveFastestRun();
+		}
 	}
 }
 
 function resetSessionTimer() {
 	// console.log("getSessionTimerMs():",getSessionTimerMs())
-	console.log("here 1")
 	if (getSessionTimerMs() == 0) return;
-	console.log("here 2")
 	// Update best individual splits for all levels in this run before clearing
 	let hasNew = false;
 	let improvedLevels = [];
@@ -2459,7 +2465,6 @@ function resetSessionTimer() {
 			}
 		}
 	}
-	console.log("hasNew:", hasNew)
 	if (hasNew) saveBestIndividualSplits();
 	if (improvedLevels.length > 0) {
 		const update = confirm(`Improved best splits for level${improvedLevels.length > 1 ? 's' : ''} ${improvedLevels.map(i => i + 1).join(', ')}! Update?`);
@@ -2473,14 +2478,9 @@ function resetSessionTimer() {
 	// reset the scroll to the start of the splits
 	if (document.getElementById('livesplit-entries')) document.getElementById('livesplit-entries').scrollLeft = 0;
 
-	console.log("levelProgress",levelProgress)
-	console.log("furthestProgress", getFurthestProgress())
 	// Compare current run time to fastest run and update if faster
 	// TODO update for large-segment categories
-	if (runFinished || levelProgress > getFurthestProgress()) {
-		setFurthestProgress(levelProgress);
-		compareFastestRun();
-	}
+	compareFastestRun();
 	
 	
 	sessionTimerAccum = 0;
@@ -2500,16 +2500,25 @@ function resetSessionTimer() {
 }
 
 function clearFastestRun() {
-	bfdia5b.removeItem(getSplitKey('fastestRunTime'));
-	bfdia5b.removeItem(getSplitKey('fastestRunCumulTimes'));
-	bfdia5b.removeItem(getSplitKey('fastestRunEntryTimes'));
-	bfdia5b.removeItem(getSplitKey('bestIndividualSplits'));
-	bfdia5b.removeItem(getSplitKey('furthest'));
+	// Remove all category-scoped fastest-run keys from storage
+	const bases = ['fastestRunTime','fastestRunCumulTimes','fastestRunEntryTimes','bestIndividualSplits','furthest'];
+	for (const cat of categoryData) {
+		for (const b of bases) {
+			bfdia5b.removeItem(b + ':' + cat.name);
+		}
+	}
+	// Also remove any keys that might have been stored without category suffix (legacy)
+	for (const b of bases) bfdia5b.removeItem(b);
+
+	// Clear in-memory maps for all categories
 	fastestRunTime = null;
-	fastestRunCumulTimes[splitCategory.name] = new Array(levelCount).fill(null);
-	fastestRunEntryTimes[splitCategory.name] = new Array(levelCount).fill(null);
+	for (const cat of categoryData) {
+		fastestRunCumulTimes[cat.name] = new Array(levelCount).fill(null);
+		fastestRunEntryTimes[cat.name] = new Array(levelCount).fill(null);
+	}
 	bestIndividualSplits = new Array(levelCount).fill(null);
-	// updateAllLivesplitEntries();
+
+	// Rebuild the UI to reflect cleared data
 	createLivesplitEntries();
 }
 
@@ -2585,9 +2594,8 @@ function updateSplitTime(levelId) {
 	}
 }
 
+
 function updateAllLivesplitEntries() {
-	console.log("called updateAllLivesplitEntries")
-	console.log("splitCategory:" + splitCategory)
 	// Update all livesplit entries to display the fastest run times
 	let indices = [];
 	if (splitCategory && typeof splitCategory.start === 'number' && typeof splitCategory.end === 'number') {
@@ -2608,7 +2616,6 @@ function updateAllLivesplitEntries() {
 	// 	for (let i = 0; i < 52; i++) indices.push(i);
 	// }
 	
-	console.log("indices:" + indices)
 	for (const i of indices) updateSplitTime(i);
 }
 
@@ -3665,22 +3672,22 @@ function drawLevelMap() {
 		() => bfdia5b.setItem('timerMod.showPrevTime', bfdia5b.getItem('timerMod.showPrevTime') != 'true'),
 		164.15, 23.20
 	);
-	drawMenu0Button('19', 100, 129.35, false, () => { levelProgress = 18; resetSessionTimer(); }, 
+	drawMenu0Button('19', 100, 129.35, false, () => { resetSessionTimer(); levelProgress = 18; }, 
 		40, 23.20
 	);
-	drawMenu0Button('31', 150, 129.35, false, () => { levelProgress = 30; resetSessionTimer(); }, 
+	drawMenu0Button('31', 150, 129.35, false, () => { resetSessionTimer(); levelProgress = 30; }, 
 		40, 23.20
 	);
-	drawMenu0Button('42', 200, 129.35, false, () => { levelProgress = 41; resetSessionTimer(); }, 
+	drawMenu0Button('42', 200, 129.35, false, () => { resetSessionTimer(); levelProgress = 41; }, 
 		40, 23.20
 	);
-	drawMenu0Button('53', 250, 129.35, false, () => { levelProgress = 52; resetSessionTimer(); }, 
+	drawMenu0Button('53', 250, 129.35, false, () => { resetSessionTimer(); levelProgress = 52; }, 
 		40, 23.20
 	);
-	drawMenu0Button('+', 295, 129.35, false, () => { levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; resetSessionTimer(); }, 
+	drawMenu0Button('+', 295, 129.35, false, () => { resetSessionTimer(); levelProgress = (levelProgress >= 52) ? 52 : levelProgress + 1; }, 
 		25, 23.20
 	);
-	drawMenu0Button('-', 325, 129.35, false, () => { levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; resetSessionTimer(); }, 
+	drawMenu0Button('-', 325, 129.35, false, () => { resetSessionTimer(); levelProgress = (levelProgress <= 0) ? 0 : levelProgress - 1; }, 
 		25, 23.20
 	);
 	for (let i = 0; i < (playingLevelpack?levelCount:133); i++) {
@@ -3728,7 +3735,6 @@ let _cachedTotalMs = null;
 
 let inLayoutEditor = false;
 function redrawTimerTexts(timer, best, total, x = 6, y = 6, scale = 0.7, alpha = 0.6) {
-	// console.log("timer:", timer, "best:", best, "total:", total);
 	if (cachedShowTimer == '0') return;
 	ctx.fillStyle = '#ffffff';
 	ctx.textAlign = 'left';
@@ -4170,6 +4176,7 @@ function playLevel(i) {
 }
 
 function resetLevel() {
+	// if (currentLevel === 1) startSessionTimer();
 	// document.getElementById('TEMP').textContent = 'Resetting level';
 	// when resetting/entering a level, clear any stay/beat/freeze state
 	levelBeat = false;
@@ -9011,7 +9018,8 @@ function draw() {
 					
 					// Stop session timer when level 52 is completed (last level in run - 1)
 					if (currentLevel === 51) {
-					// if (currentLevel === 2) {
+					// if (currentLevel === 43) {
+					// if (currentLevel === 3) {
 						stopSessionTimer();
 					}
 
