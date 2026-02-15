@@ -364,6 +364,7 @@ function saveBestIndividualSplits() {
 }
 
 function loadFastestRun() {
+	console.log("loadFastestRun called")
 	const savedTime = bfdia5b.getItem(getSplitKey('fastestRunTime'));
 	if (savedTime !== null) {
 		fastestRunTime = parseInt(savedTime, 10);
@@ -2371,16 +2372,23 @@ const _mmss_msecs = (function(){
 })();
 
 function toMMSSms(ms) {
-	const totalMs = Number(ms) || 0;
-	const minutes = Math.floor(totalMs / 60000);
-	const seconds = Math.floor((totalMs % 60000) / 1000);
-	const msecs = totalMs % 1000;
-	// return (
-	// 	minutes.toString().padStart(2, '0') + ':' +
-	// 	seconds.toString().padStart(2, '0') + '.' +
-	// 	msecs.toString().padStart(3, '0')
-	// );
-	const minStr = (minutes < 10) ? ('0' + minutes) : (minutes < 100 ? '' + minutes : minutes.toString());
+	// const totalMs = Number(ms) || 0;
+	// const minutes = Math.floor(totalMs / 60000);
+	// const seconds = Math.floor((totalMs % 60000) / 1000);
+	// const msecs = totalMs % 1000;
+	// const minStr = (minutes < 10) ? ('0' + minutes) : (minutes < 100 ? '' + minutes : minutes.toString());
+	// return minStr + ':' + _mmss_seconds[seconds] + '.' + _mmss_msecs[msecs];
+
+	ms = ms | 0; // fast int cast
+	const minutes = (ms / 60000) | 0;
+	ms -= minutes * 60000;
+	const seconds = (ms / 1000) | 0;
+	const msecs = ms - seconds * 1000;
+	const minStr = minutes < 10
+		? '0' + minutes
+		: minutes < 100
+			? '' + minutes
+			: '' + minutes;
 	return minStr + ':' + _mmss_seconds[seconds] + '.' + _mmss_msecs[msecs];
 }
 
@@ -2394,10 +2402,14 @@ function updateSessionTimerDisplay() {
 
 // Return current session timer in milliseconds (uses real-world time)
 function getSessionTimerMs() {
-	if (sessionTimerRunning && sessionTimerStartWallTime != null) {
-		return Math.round(sessionTimerAccum + (performance.now() - sessionTimerStartWallTime));
+	// if (sessionTimerRunning && sessionTimerStartWallTime != null) {
+	// 	return Math.round(sessionTimerAccum + (performance.now() - sessionTimerStartWallTime));
+	// }
+	// return Math.round(sessionTimerAccum);
+	if (!sessionTimerRunning || sessionTimerStartWallTime == null) {
+		return sessionTimerAccum | 0;
 	}
-	return Math.round(sessionTimerAccum);
+	return (sessionTimerAccum + (performance.now() - sessionTimerStartWallTime)) | 0;
 }
 
 function startSessionTimer() {
@@ -2523,26 +2535,25 @@ function clearFastestRun() {
 }
 
 function updateSplitTime(levelId) {
-	// console.log("called updateSplitTime")
+	console.log("called updateSplitTime, levelID:",levelId)
 	// Update the corresponding split entry in the DOM using stored `prev`/`best` values.
 	const el = document.getElementById('split-time-' + levelId);
 	if (!el) return; // split not displayed for current category
 	// Prefer the session-run split (the duration between entering and exiting the level)
 	let value = null;
-	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
-		value = sessionSplitTimes[levelId];
-		// document.getElementById('TEMP').textContent = "sessionSplitTimes:", sessionSplitTimes;
-	} else {
-		// Prefer explicit split (entry) times from the fastest run saved in storage.
-		// If not loaded into memory yet, try loading it.
-		const entryArr = ensureEntryArrayForCurrentCategory();
-		if (Array.isArray(entryArr) && entryArr.every(v => v == null)) {
-			loadFastestRun();
-		}
-		if (Array.isArray(entryArr) && entryArr[levelId] != null) {
-			value = entryArr[levelId];
-		}
-	}
+	// if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
+	value = sessionSplitTimes[levelId];
+	// } else {
+	// 	// Prefer explicit split (entry) times from the fastest run saved in storage.
+	// 	// If not loaded into memory yet, try loading it.
+	// 	const entryArr = ensureEntryArrayForCurrentCategory();
+	// 	if (Array.isArray(entryArr) && entryArr.every(v => v == null)) {
+	// 		loadFastestRun();
+	// 	}
+	// 	if (Array.isArray(entryArr) && entryArr[levelId] != null) {
+	// 		value = entryArr[levelId];
+	// 	}
+	// }
 	if (value != null && !isNaN(value)) {
 		el.textContent = toMMSSms(value);
 	} else {
@@ -2596,6 +2607,7 @@ function updateSplitTime(levelId) {
 
 
 function updateAllLivesplitEntries() {
+	console.log("updateAllLivesplitEntries called")
 	// Update all livesplit entries to display the fastest run times
 	let indices = [];
 	if (splitCategory && typeof splitCategory.start === 'number' && typeof splitCategory.end === 'number') {
@@ -2603,18 +2615,6 @@ function updateAllLivesplitEntries() {
 	} else {
 		for (let i = 0; i < levelCount; i++) indices.push(i);
 	}
-	// if (splitCategory === 'booksegment') {
-	// 	for (let i = 0; i < 19; i++) indices.push(i);
-	// }
-	// else if (splitCategory === 'matchsegment') {
-	// 	for (let i = 18; i < 42; i++) indices.push(i);
-	// }
-	// else if (splitCategory === 'icecubesegment') {
-	// 	for (let i = 41; i < 52; i++) indices.push(i);
-	// }
-	// else {
-	// 	for (let i = 0; i < 52; i++) indices.push(i);
-	// }
 	
 	for (const i of indices) updateSplitTime(i);
 }
@@ -8995,7 +8995,7 @@ function draw() {
 					const sessionNow = getSessionTimerMs();
 					let elapsedMs = null;
 					if (sessionTimerLastEntry != null) {
-						elapsedMs = Math.round(sessionNow - sessionTimerLastEntry);
+						elapsedMs = Math.floor(sessionNow - sessionTimerLastEntry);
 					} else {
 						// fallback to previous timing if sessionTimerLastEntry wasn't set
 						elapsedMs = parseInt((getTimerCached - levelTimer2).toFixed(0), 10);
@@ -11579,6 +11579,7 @@ function draw() {
 	_frameCount++;
 	// Update session timer display
 	if (sessionTimerRunning) updateSessionTimerDisplay();
+	// if (_frameCount % 6 === 0 && sessionTimerRunning) updateSessionTimerDisplay();
 	pmouseIsDown = mouseIsDown;
 	_pxmouse = _xmouse;
 	_pymouse = _ymouse;
