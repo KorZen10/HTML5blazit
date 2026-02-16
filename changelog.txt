@@ -6,7 +6,11 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 3) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
-02/28/26:
+02/15/26:
+-Added the cursed overlay and background in the menu screen. I'm so proud of myself...
+-Fix bugs with and optimizations to the Livesplit timer
+
+02/08/26:
 -Added categories to the Livesplit timer! This allows you to save your best times in each category and switch easily between them. The autosplitter will also automatically detect when a Book, Match, or Ice Cube run starts/stops based on when you enter the dialogue region.
 
 02/05/26:

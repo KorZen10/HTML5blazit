@@ -2676,6 +2676,8 @@ let svgMenu6;
 let svgMenu2border;
 let svgMenu2borderimg;
 let preMenuBG;
+let svgMenuBg;
+let svgMenuOverlay;
 let svgTools = new Array(12);
 let svgMyLevelsIcons = new Array(5);
 let menu2_3Buttons = [
@@ -2864,6 +2866,8 @@ async function loadingScreen() {
 			svgAcidDrop[i] = await createImage(resourceData['effects/aciddrop' + i.toString().padStart(4, '0') + '.svg']);
 		}
 		svgMenu0 = await createImage(resourceData['menu0.svg']);
+		svgMenuBg = await createImage('visuals/5blazit_menu_bg.png');
+		svgMenuOverlay = await createImage('visuals/5blazit_menu_overlay.png');
 		svgMenu2 = await createImage(resourceData['menu2.svg']);
 		svgMenu6 = await createImage(resourceData['menu6.svg']);
 		svgMenu2border = await createImage(resourceData['menu2border.svg']);
@@ -3556,7 +3560,9 @@ function drawRoundedRect(fill, x, y, w, h, cr) {
 function drawMenu() {
 	ctx.fillStyle = '#666666';
 	ctx.fillRect(0, 0, cwidth, cheight);
+	ctx.drawImage(svgMenuBg, 0, 0, cwidth, cheight);
 	ctx.drawImage(svgMenu0, 0, 0, cwidth, cheight);
+	ctx.drawImage(svgMenuOverlay, 0, 0, cwidth, cheight);
 	ctx.fillStyle = '#ffffff';
 	ctx.textBaseline = 'bottom';
 	ctx.textAlign = 'left';
@@ -4707,11 +4713,11 @@ function drawCharacters(context) {
 						img = svgBodyParts[bodyPartAnimations[modelFrame[j].anim].bodypart];
 						let bpanimframe = modelFrame[j].loop
 							? (char[i].poseTimer + modelFrame[j].offset) %
-							  bodyPartAnimations[modelFrame[j].anim].frames.length
+								bodyPartAnimations[modelFrame[j].anim].frames.length
 							: Math.min(
 									char[i].poseTimer + modelFrame[j].offset,
 									bodyPartAnimations[modelFrame[j].anim].frames.length - 1
-							  );
+							);
 						let mat = bodyPartAnimations[modelFrame[j].anim].frames[bpanimframe];
 						context.transform(mat.a, mat.b, mat.c, mat.d, mat.tx, mat.ty);
 					} else if (modelFrame[j].type == 'dia') {
