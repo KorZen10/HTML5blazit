@@ -7,6 +7,7 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
 02/15/26:
+-Added additional "Missed win tokens" split to 100% autosplitter. Now, if you're running 100% and missed any win tokens, your run won't immediately end when you beat level 52.
 -Added the cursed overlay and background in the menu screen. I'm so proud of myself...
 -Fix bugs with and optimizations to the Livesplit timer
 
@@ -14,7 +15,7 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 -Added categories to the Livesplit timer! This allows you to save your best times in each category and switch easily between them. The autosplitter will also automatically detect when a Book, Match, or Ice Cube run starts/stops based on when you enter the dialogue region.
 
 02/05/26:
--Added ability to change the color of keys in the input display when they are pressed
+-Added ability to change the color of keys in the input display when they are pressed! Press U or I while in the "Change Layout" screen.
 -Found and fixed another big performance sink (buttons in menu select were still being run every frame even during gameplay)
 
 02/03/26:
@@ -22,7 +23,7 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 -Input display pressed keys are now white instead of blue so they're easier to see
 
 02/01/26:
--Diagnosed the massive performance issue; slow Livesplit timer operations were being called once or more every single frame.
+-Diagnosed a massive performance issue; slow Livesplit timer operations were being called once or more every single frame.
 -Added the loading screen.
 
 01/29/26:

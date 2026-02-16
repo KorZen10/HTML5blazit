@@ -2431,19 +2431,9 @@ function stopSessionTimer() {
 }
 
 function compareFastestRun() {	
-	console.log("runFinished:", runFinished)
-	console.log("levelProgress:", levelProgress)
-	console.log("getFurthestProgress():", getFurthestProgress())
-	console.log("fastestRunTime:", fastestRunTime)
-	console.log("sessionTimerAccum:", sessionTimerAccum)
-	console.log("fastestRunTime:", fastestRunTime)
-
 	if (runFinished || levelProgress > getFurthestProgress()) {
-		console.log("entered!!!!")
 		setFurthestProgress(levelProgress);
-		
 		if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
-			console.log("new fastest run!")
 			// New fastest run!
 			if (fastestRunTime !== null) fastestRunTime = sessionTimerAccum;
 			// Save under current category
@@ -2535,7 +2525,6 @@ function clearFastestRun() {
 }
 
 function updateSplitTime(levelId) {
-	console.log("called updateSplitTime, levelID:",levelId)
 	// Update the corresponding split entry in the DOM using stored `prev`/`best` values.
 	const el = document.getElementById('split-time-' + levelId);
 	if (!el) return; // split not displayed for current category
@@ -2615,7 +2604,9 @@ function updateAllLivesplitEntries() {
 	} else {
 		for (let i = 0; i < levelCount; i++) indices.push(i);
 	}
-	
+	// Include special 100% 'missed' split
+	if (splitCategory && splitCategory.name === '100%') indices.push('missed');
+
 	for (const i of indices) updateSplitTime(i);
 }
 
@@ -8725,23 +8716,16 @@ function createLivesplitEntries() {
 	splitsContainer.innerHTML = '';
 	// Determine which split indices to display for the current category
 	let indices = [];
-	if (splitCategory && typeof splitCategory.start === 'number' && typeof splitCategory.end === 'number') {
+	if (splitCategory) {
 		for (let i = splitCategory.start; i <= splitCategory.end; i++) indices.push(i);
-	} else {
+	}
+	else {
 		for (let i = 0; i < levelCount; i++) indices.push(i);
 	}
-	// if (splitCategory === 'booksegment') {
-	// 	for (let i = 0; i < 19; i++) indices.push(i);
-	// }
-	// else if (splitCategory === 'matchsegment') {
-	// 	for (let i = 18; i < 42; i++) indices.push(i);
-	// }
-	// else if (splitCategory === 'icecubesegment') {
-	// 	for (let i = 41; i < 52; i++) indices.push(i);
-	// }
-	// else {
-	// 	for (let i = 0; i < 52; i++) indices.push(i);
-	// }
+
+	// Add special 'missed' split for 100% category
+	if (splitCategory && splitCategory.name === '100%') indices.push('missed');
+	
 	for (const i of indices) {
 		const entry = document.createElement('div');
 		entry.className = 'livesplit-entry';
@@ -8749,8 +8733,12 @@ function createLivesplitEntries() {
 		const name = document.createElement('div');
 		name.className = 'entry-name';
 		name.id = 'split-name-' + i;
-		// If levelName is available use it, otherwise fall back to a generic label.
-		name.textContent = 'Level ' + (i + 1) + (levelName && levelName[i] ? ': ' + levelName[i] : '');
+		// If this is the special 100% split show its label, otherwise show level name
+		if (i === 'missed') {
+			name.textContent = 'Missed win tokens';
+		} else {
+			name.textContent = 'Level ' + (i + 1) + (levelName && levelName[i] ? ': ' + levelName[i] : '');
+		}
 
 		// Container for both times on the same line
 		const timesRow = document.createElement('div');
@@ -8765,9 +8753,9 @@ function createLivesplitEntries() {
 			time.textContent = toMMSSms(sessionSplitTimes[i]);
 		} else {
 			const cumulArr = ensureCumulArrayForCurrentCategory();
-			if (Array.isArray(cumulArr) && cumulArr[i] != null) {
+			if (typeof i === 'number' && Array.isArray(cumulArr) && cumulArr[i] != null) {
 				// Calculate split from fastest run: cumul[i] - cumul[i-1]
-				const prevCumul = i > 0 && cumulArr[i - 1] != null ? cumulArr[i - 1] : 0;
+				const prevCumul = (i > 0 && cumulArr[i - 1] != null) ? cumulArr[i - 1] : 0;
 				const split = cumulArr[i] - prevCumul;
 				time.textContent = toMMSSms(split);
 			} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
@@ -8787,7 +8775,7 @@ function createLivesplitEntries() {
 			cumulTime.textContent = toMMSSms(sessionNow);
 		} else {
 			const cumulArr = ensureCumulArrayForCurrentCategory();
-			if (Array.isArray(cumulArr) && cumulArr[i] != null && cumulArr[i] > 0) {
+			if (typeof i === 'number' && Array.isArray(cumulArr) && cumulArr[i] != null && cumulArr[i] > 0) {
 				cumulTime.textContent = toMMSSms(cumulArr[i]);
 			} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
 				cumulTime.textContent = toMMSSms(parseInt(prev[i], 10));
@@ -9023,9 +9011,20 @@ function draw() {
 					try { document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry; } catch (e) {}
 					
 					// Stop session timer when level 52 is completed (last level in run - 1)
-					if (currentLevel === 51) {
-					// if (currentLevel === 43) {
-					// if (currentLevel === 3) {
+					if (currentLevel === 51 && splitCategory.name !== '100%') {
+						stopSessionTimer();
+					}
+					// TODO: this is untested
+					else if (splitCategory.name === '100%' && coins == 52) {
+						// Autosplit the 100% 'missed' entry manually
+						const sessionNow = getSessionTimerMs();
+						const prevIndex = (splitCategory) ? splitCategory.end : (levelCount - 1);
+						const prevCumul = (sessionCumulTimes[prevIndex] != null) ? sessionCumulTimes[prevIndex] : 0;
+						sessionSplitTimes['missed'] = Math.floor(sessionNow - prevCumul);
+						sessionCumulTimes['missed'] = sessionNow;
+						sessionEntryTimes['missed'] = performance.now();
+						updateSplitTime('missed');
+
 						stopSessionTimer();
 					}
 

@@ -169,6 +169,13 @@ p{
 	color: #fff;
 	font-variant-numeric: tabular-nums;
 }
+#splitCategorySelect {
+	vertical-align: bottom;
+	align-self: center;
+	font-size: 10px;
+	color: #666;
+	font-weight: bold;
+}
 
 /* broken for some reason */
 .speedrun-btn {
@@ -186,4 +193,14 @@ p{
 	font-size: 12px;
 	font-weight: bold;
 
+}
+#reload-text {
+	font-size: 30px;
+	font-weight: bold;
+	color: #888888;
+	display: flex;
+    justify-content: center; /* Centers horizontally */
+    align-items: center;     /* Centers vertically */
+    height: 75vh;           /* Sets the container height to the full viewport height */
+    width: 100%;
 }
