@@ -6,6 +6,9 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 3) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
+02/19/26:
+-Fixed HPRC recovery savestate bug (I forgot to load a variable) 
+
 02/15/26:
 -Added additional "Missed win tokens" split to 100% autosplitter. Now, if you're running 100% and missed any win tokens, your run won't immediately end when you beat level 52.
 -Added the cursed overlay and background in the menu screen. I'm so proud of myself...

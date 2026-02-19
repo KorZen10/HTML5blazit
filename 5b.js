@@ -11755,9 +11755,11 @@ function loadState() {
 		doorLightFadeDire[i] = 0;
 	}
 
+	recover2 = recover2Backup;
+
 	// advance to next frame so that we can actually see the load happen
 	advanceFrame();
-
+	// nice try
 	resetSessionTimer();
 }
 
