@@ -9006,28 +9006,30 @@ function draw() {
 					if (sessionEntryTimes[currentLevel] == null) {
 						sessionEntryTimes[currentLevel] = performance.now();
 					}
-					updateSplitTime(currentLevel);
-					currSplit++;
-					// update sessionTimerLastEntry so the next split measures from this point
-					sessionTimerLastEntry = sessionNow;
-					// document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry;
+					// Livesplit timer stuff
+					if (sessionTimerRunning) {
+						updateSplitTime(currentLevel);
+						currSplit++;
+						// update sessionTimerLastEntry so the next split measures from this point
+						sessionTimerLastEntry = sessionNow;
+						// Stop session timer when level 52 is completed (last level in run - 1)
+						if (currentLevel === 51 && splitCategory.name !== '100%') {
+							stopSessionTimer();
+						}
+						else if (splitCategory.name === '100%' && coins == 52) {
+							// Autosplit the 100% 'missed' entry manually
+							const sessionNow = getSessionTimerMs();
+							const prevIndex = (splitCategory) ? splitCategory.end : (levelCount - 1);
+							const prevCumul = (sessionCumulTimes[prevIndex] != null) ? sessionCumulTimes[prevIndex] : 0;
+							sessionSplitTimes['missed'] = Math.floor(sessionNow - prevCumul);
+							sessionCumulTimes['missed'] = sessionNow;
+							sessionEntryTimes['missed'] = performance.now();
+							updateSplitTime('missed');
+	
+							stopSessionTimer();
+						}
+					}
 					
-					// Stop session timer when level 52 is completed (last level in run - 1)
-					if (currentLevel === 51 && splitCategory.name !== '100%') {
-						stopSessionTimer();
-					}
-					else if (splitCategory.name === '100%' && coins == 52) {
-						// Autosplit the 100% 'missed' entry manually
-						const sessionNow = getSessionTimerMs();
-						const prevIndex = (splitCategory) ? splitCategory.end : (levelCount - 1);
-						const prevCumul = (sessionCumulTimes[prevIndex] != null) ? sessionCumulTimes[prevIndex] : 0;
-						sessionSplitTimes['missed'] = Math.floor(sessionNow - prevCumul);
-						sessionCumulTimes['missed'] = sessionNow;
-						sessionEntryTimes['missed'] = performance.now();
-						updateSplitTime('missed');
-
-						stopSessionTimer();
-					}
 
 					if (!freezeLevelTimer) {
 						timer += getTimerCached - levelTimer2;
@@ -11568,7 +11570,7 @@ function draw() {
 	_frameCount++;
 	// Update session timer display
 	if (sessionTimerRunning) updateSessionTimerDisplay();
-	// if (_frameCount % 60 === 0 && sessionTimerRunning) updateSessionTimerDisplay();
+	// if (_frameCount % 6 === 0 && sessionTimerRunning) updateSessionTimerDisplay();
 	pmouseIsDown = mouseIsDown;
 	_pxmouse = _xmouse;
 	_pymouse = _ymouse;
