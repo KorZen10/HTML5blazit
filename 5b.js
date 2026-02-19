@@ -181,6 +181,8 @@ let fastestRunTime = null; // fastest total sessionTimerAccum when run completed
 // Per-category maps: { [categoryName]: Array(levelCount) }
 let fastestRunCumulTimes = {};
 let fastestRunEntryTimes = {};
+// Track whether we've loaded persisted fastest-run data for a category
+let fastestRunLoaded = {};
 
 function ensureCumulArrayForCurrentCategory() {
 	if (!Array.isArray(fastestRunCumulTimes[splitCategory.name])) fastestRunCumulTimes[splitCategory.name] = new Array(levelCount).fill(null);
@@ -364,8 +366,8 @@ function saveBestIndividualSplits() {
 }
 
 function loadFastestRun() {
-	console.log("loadFastestRun called")
 	const savedTime = bfdia5b.getItem(getSplitKey('fastestRunTime'));
+	console.log("loadFastestRun called; savedTime:", savedTime)
 	if (savedTime !== null) {
 		fastestRunTime = parseInt(savedTime, 10);
 		const savedCumuls = bfdia5b.getItem(getSplitKey('fastestRunCumulTimes'));
@@ -374,9 +376,11 @@ function loadFastestRun() {
 			fastestRunCumulTimes[splitCategory.name] = savedCumuls.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
 		}
 		const savedEntryTimes = bfdia5b.getItem(getSplitKey('fastestRunEntryTimes'));
+		console.log("savedEntryTimes:",savedEntryTimes)
 		if (savedEntryTimes) {
 			// Store parsed entry times into the current category map
 			fastestRunEntryTimes[splitCategory.name] = savedEntryTimes.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
+			console.log("fastestRunEntryTimes:",fastestRunEntryTimes)
 		}
 		const savedBestIndividual = bfdia5b.getItem(getSplitKey('bestIndividualSplits'));
 		if (savedBestIndividual) {
@@ -390,6 +394,8 @@ function loadFastestRun() {
 		fastestRunEntryTimes[splitCategory.name] = new Array(levelCount).fill(null);
 		bestIndividualSplits = new Array(levelCount).fill(null);
 	}
+	// mark this category as loaded (even if empty)
+	fastestRunLoaded[splitCategory.name] = true;
 }
 
 function saveSettings() {
@@ -2431,15 +2437,16 @@ function stopSessionTimer() {
 }
 
 function compareFastestRun() {	
+	console.log("runFinished:",runFinished)
 	if (runFinished || levelProgress > getFurthestProgress()) {
 		setFurthestProgress(levelProgress);
+		console.log("fastestRunTime:",fastestRunTime, "sessionTimerAccum:",sessionTimerAccum)
 		if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
 			// New fastest run!
-			if (fastestRunTime !== null) fastestRunTime = sessionTimerAccum;
+			if (runFinished) fastestRunTime = sessionTimerAccum;
 			// Save under current category
 			fastestRunCumulTimes[splitCategory.name] = [...sessionCumulTimes]; // Copy current session cumulative times
 			fastestRunEntryTimes[splitCategory.name] = sessionCumulTimes.map((cumul, i) => {
-				console.log("cumul:", cumul, "i:", i)
 				if (cumul == null) return null;
 				if (i === 0) return cumul;
 				const prev = (sessionCumulTimes[i-1] === null) ? 0 : sessionCumulTimes[i-1];
@@ -2481,9 +2488,7 @@ function resetSessionTimer() {
 	if (document.getElementById('livesplit-entries')) document.getElementById('livesplit-entries').scrollLeft = 0;
 
 	// Compare current run time to fastest run and update if faster
-	// TODO update for large-segment categories
 	compareFastestRun();
-	
 	
 	sessionTimerAccum = 0;
 	sessionTimerStartWallTime = null;
@@ -2528,25 +2533,23 @@ function updateSplitTime(levelId) {
 	// Update the corresponding split entry in the DOM using stored `prev`/`best` values.
 	const el = document.getElementById('split-time-' + levelId);
 	if (!el) return; // split not displayed for current category
-	// Prefer the session-run split (the duration between entering and exiting the level)
 	let value = null;
-	// if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
-	value = sessionSplitTimes[levelId];
-	// } else {
-	// 	// Prefer explicit split (entry) times from the fastest run saved in storage.
-	// 	// If not loaded into memory yet, try loading it.
-	// 	const entryArr = ensureEntryArrayForCurrentCategory();
-	// 	if (Array.isArray(entryArr) && entryArr.every(v => v == null)) {
-	// 		loadFastestRun();
-	// 	}
-	// 	if (Array.isArray(entryArr) && entryArr[levelId] != null) {
-	// 		value = entryArr[levelId];
-	// 	}
-	// }
+	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
+		value = sessionSplitTimes[levelId];
+	} else {
+		// Prefer explicit split (entry) times from the fastest run saved in storage.
+		const entryArr = ensureEntryArrayForCurrentCategory();
+		// Use per-category persisted entry times if present (no lazy-load here for performance)
+		if (Array.isArray(entryArr) && entryArr[levelId] != null) {
+			value = entryArr[levelId];
+		} else if (typeof prev !== 'undefined' && prev[levelId] != undefined && prev[levelId] !== 'NaN') {
+			value = parseInt(prev[levelId], 10);
+		}
+	}
 	if (value != null && !isNaN(value)) {
 		el.textContent = toMMSSms(value);
 	} else {
-		el.textContent = '\u2014'; // em dash for no time
+		el.textContent = '\u2014';
 	}
 	
 	// Update cumulative time on the right side
@@ -2614,9 +2617,10 @@ function applyFastestRunToSession() {
 	// Copy fastest-run data into current session arrays so the UI shows them
 	// Ensure fastest-run arrays are loaded
 	const cumulArr = ensureCumulArrayForCurrentCategory();
-	if (Array.isArray(cumulArr) && cumulArr.every(v => v == null)) {
+	console.log("cumulArr:",cumulArr)
+	// if (Array.isArray(cumulArr) && cumulArr.every(v => v == null)) {
 		loadFastestRun();
-	}
+	// }
 	updateAllLivesplitEntries();
 }
 
