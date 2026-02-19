@@ -9010,7 +9010,7 @@ function draw() {
 					currSplit++;
 					// update sessionTimerLastEntry so the next split measures from this point
 					sessionTimerLastEntry = sessionNow;
-					document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry;
+					// document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry;
 					
 					// Stop session timer when level 52 is completed (last level in run - 1)
 					if (currentLevel === 51 && splitCategory.name !== '100%') {
@@ -11568,7 +11568,7 @@ function draw() {
 	_frameCount++;
 	// Update session timer display
 	if (sessionTimerRunning) updateSessionTimerDisplay();
-	// if (_frameCount % 6 === 0 && sessionTimerRunning) updateSessionTimerDisplay();
+	// if (_frameCount % 60 === 0 && sessionTimerRunning) updateSessionTimerDisplay();
 	pmouseIsDown = mouseIsDown;
 	_pxmouse = _xmouse;
 	_pymouse = _ymouse;
@@ -11590,7 +11590,8 @@ function rAF60fps() {
 	requestAnimationFrame(rAF60fps);
 	if (noLag) {
 		draw();
-	} else {
+	}
+	else {
 		now = window.performance.now();
 		delta = now - then;
 		if (delta > interval) {
