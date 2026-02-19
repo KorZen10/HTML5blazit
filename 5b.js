@@ -123,6 +123,7 @@ function findCategoryByName(name) {
 
 // Default to the saved category id (stored as name) or the any% object
 let splitCategory = findCategoryByName(bfdia5b.getItem('splitCategory') || 'any%');
+let currSplit = 0; // only currently used for setting scroll value
 
 function getSplitKey(base) {
 	return base + ':' + splitCategory.name;
@@ -137,7 +138,7 @@ function setSplitCategory(cat) {
 	splitCategory = catObj || findCategoryByName('any%');
 	bfdia5b.setItem('splitCategory', splitCategory.name);
 	if (document.getElementById && document.getElementById('splitCategorySelect')) {
-		try { document.getElementById('splitCategorySelect').value = splitCategory.name; } catch (e) {}
+		document.getElementById('splitCategorySelect').value = splitCategory.name;
 	}
 	loadFastestRun();
 	// Rebuild entries for the selected category then refresh their contents
@@ -367,7 +368,6 @@ function saveBestIndividualSplits() {
 
 function loadFastestRun() {
 	const savedTime = bfdia5b.getItem(getSplitKey('fastestRunTime'));
-	console.log("loadFastestRun called; savedTime:", savedTime)
 	if (savedTime !== null) {
 		fastestRunTime = parseInt(savedTime, 10);
 		const savedCumuls = bfdia5b.getItem(getSplitKey('fastestRunCumulTimes'));
@@ -376,11 +376,9 @@ function loadFastestRun() {
 			fastestRunCumulTimes[splitCategory.name] = savedCumuls.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
 		}
 		const savedEntryTimes = bfdia5b.getItem(getSplitKey('fastestRunEntryTimes'));
-		console.log("savedEntryTimes:",savedEntryTimes)
 		if (savedEntryTimes) {
 			// Store parsed entry times into the current category map
 			fastestRunEntryTimes[splitCategory.name] = savedEntryTimes.split(',').map(t => t === 'null' ? null : parseInt(t, 10));
-			console.log("fastestRunEntryTimes:",fastestRunEntryTimes)
 		}
 		const savedBestIndividual = bfdia5b.getItem(getSplitKey('bestIndividualSplits'));
 		if (savedBestIndividual) {
@@ -2437,10 +2435,8 @@ function stopSessionTimer() {
 }
 
 function compareFastestRun() {	
-	console.log("runFinished:",runFinished)
 	if (runFinished || levelProgress > getFurthestProgress()) {
 		setFurthestProgress(levelProgress);
-		console.log("fastestRunTime:",fastestRunTime, "sessionTimerAccum:",sessionTimerAccum)
 		if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
 			// New fastest run!
 			if (runFinished) fastestRunTime = sessionTimerAccum;
@@ -2493,6 +2489,8 @@ function resetSessionTimer() {
 	sessionTimerAccum = 0;
 	sessionTimerStartWallTime = null;
 	sessionTimerRunning = false;
+	currSplit = 0;
+	prevSplitSessionTime = 0;
 	// Clear session arrays so that updateSplitTime falls back to fastest run data
 	sessionSplitTimes.fill(null);
 	sessionCumulTimes.fill(null);
@@ -2529,77 +2527,90 @@ function clearFastestRun() {
 	createLivesplitEntries();
 }
 
+let prevSplitSessionTime = null;
 function updateSplitTime(levelId) {
-	// Update the corresponding split entry in the DOM using stored `prev`/`best` values.
-	const el = document.getElementById('split-time-' + levelId);
-	if (!el) return; // split not displayed for current category
+	// Update the entry time on the left side using previous split session time value
+	const splitEl = document.getElementById('split-time-' + levelId);
 	let value = null;
-	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
-		value = sessionSplitTimes[levelId];
-	} else {
-		// Prefer explicit split (entry) times from the fastest run saved in storage.
+	// If a time exists for this split, calculate a different time (lol I know this sucks). Else, use times from the fastest run.
+	if (sessionSplitTimes !== "undefined" && sessionSplitTimes[levelId] != null) {
+		value = getSessionTimerMs() - prevSplitSessionTime;
+		console.log(value)
+	}
+	else {
 		const entryArr = ensureEntryArrayForCurrentCategory();
-		// Use per-category persisted entry times if present (no lazy-load here for performance)
-		if (Array.isArray(entryArr) && entryArr[levelId] != null) {
+		if (entryArr[levelId] != null) {
 			value = entryArr[levelId];
-		} else if (typeof prev !== 'undefined' && prev[levelId] != undefined && prev[levelId] !== 'NaN') {
-			value = parseInt(prev[levelId], 10);
 		}
 	}
 	if (value != null && !isNaN(value)) {
-		el.textContent = toMMSSms(value);
-	} else {
-		el.textContent = '\u2014';
+		splitEl.textContent = toMMSSms(value);
 	}
-	
-	// Update cumulative time on the right side
+	else {
+		splitEl.textContent = '\u2014';
+	}
+
+	// Then update cumulative time on the right side
 	const cumulEl = document.getElementById('split-cumul-time-' + levelId);
-	if (cumulEl) {
-		// Prefer current session cumulative time if we have an active split
-		if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[levelId] != null) {
-			const sessionNow = getSessionTimerMs();
-			cumulEl.textContent = sessionNow > 0 ? toMMSSms(sessionNow) : '\u2014';
-		} else {
-			const cumulArr = ensureCumulArrayForCurrentCategory();
-			if (Array.isArray(cumulArr) && cumulArr[levelId] != null && cumulArr[levelId] > 0) {
-				cumulEl.textContent = toMMSSms(cumulArr[levelId]);
-			} else {
-				cumulEl.textContent = '\u2014';
-			}
+	// Prefer current session cumulative time if we have an active split
+	if (sessionSplitTimes[levelId] != null) {
+		const sessionNow = getSessionTimerMs();
+		cumulEl.textContent = sessionNow > 0 ? toMMSSms(sessionNow) : '\u2014';
+		prevSplitSessionTime = sessionNow;
+	} else {
+		const cumulArr = ensureCumulArrayForCurrentCategory();
+		if (cumulArr[levelId] != null && cumulArr[levelId] > 0) {
+			cumulEl.textContent = toMMSSms(cumulArr[levelId]);
+		}
+		else {
+			cumulEl.textContent = '\u2014';
 		}
 	}
 	
 	// Update delta between current run and fastest run
 	const deltaEl = document.getElementById('split-delta-' + levelId);
-	if (deltaEl) {
-		let delta = null;
-		const cumulArr = ensureCumulArrayForCurrentCategory();
-		if (sessionCumulTimes[levelId] != null && Array.isArray(cumulArr) && cumulArr[levelId] != null) {
-			delta = sessionCumulTimes[levelId] - cumulArr[levelId];
-		}
-		if (delta != null) {
-			const sign = delta >= 0 ? '+' : '-';
-			deltaEl.textContent = sign + toMMSSms(Math.abs(delta));
+	let delta = null;
+	const cumulArr = ensureCumulArrayForCurrentCategory();
+	if (sessionCumulTimes[levelId] != null && cumulArr[levelId] != null) {
+		delta = sessionCumulTimes[levelId] - cumulArr[levelId];
+	}
+	if (delta != null) {
+		const sign = delta >= 0 ? '+' : '-';
+		deltaEl.textContent = sign + toMMSSms(Math.abs(delta));
 
-			console.log("sessionSplitTimes[levelId]",sessionSplitTimes[levelId])
-			console.log("bestIndividualSplits[levelId]",bestIndividualSplits[levelId])
-
-			// Color gold if this split is the best individual, else red/green
-			if (sessionSplitTimes[levelId] < bestIndividualSplits[levelId]) {
-				deltaEl.style.color = 'gold';
-			} else {
-				deltaEl.style.color = delta > 0 ? 'red' : '#00FF00';
-			}
+		// Color gold if this split is the best individual, else red/green
+		if (sessionSplitTimes[levelId] < bestIndividualSplits[levelId]) {
+			deltaEl.style.color = 'gold';
 		} else {
-			deltaEl.textContent = '';
-			deltaEl.style.color = '#999'; // default color
+			deltaEl.style.color = delta > 0 ? 'red' : '#00FF00';
+		}
+	} else {
+		deltaEl.textContent = '';
+		deltaEl.style.color = '#999'; // default color
+	}
+
+	// Auto-scroll livesplit entries one entry to the right so the newly-completed split becomes visible
+	const container = document.getElementById('livesplit-entries');
+	let numSplits = splitCategory.end - splitCategory.start + 1;
+	if (splitCategory.name == "100%") numSplits++;
+	const firstEntry = container.querySelector('.livesplit-entry');
+
+	if (firstEntry && levelProgress > splitCategory.start && sessionTimerRunning === true) {
+		const amount = Math.round(firstEntry.getBoundingClientRect().width + 4.1);
+		let scrollLoc = amount * currSplit;
+		console.log("scrollLoc:", scrollLoc);
+		console.log("currSplit:", currSplit);
+		console.log("amount:", amount);
+		if (typeof container.scrollBy === 'function') {
+			container.scrollTo({ left: scrollLoc, behavior: 'smooth' });
+		} else {
+			container.scrollLeft = scrollLoc;
 		}
 	}
 }
 
 
 function updateAllLivesplitEntries() {
-	console.log("updateAllLivesplitEntries called")
 	// Update all livesplit entries to display the fastest run times
 	let indices = [];
 	if (splitCategory && typeof splitCategory.start === 'number' && typeof splitCategory.end === 'number') {
@@ -2614,32 +2625,25 @@ function updateAllLivesplitEntries() {
 }
 
 function applyFastestRunToSession() {
-	// Copy fastest-run data into current session arrays so the UI shows them
-	// Ensure fastest-run arrays are loaded
-	const cumulArr = ensureCumulArrayForCurrentCategory();
-	console.log("cumulArr:",cumulArr)
+	// const cumulArr = ensureCumulArrayForCurrentCategory();
 	// if (Array.isArray(cumulArr) && cumulArr.every(v => v == null)) {
-		loadFastestRun();
+	loadFastestRun();
 	// }
 	updateAllLivesplitEntries();
 }
 
 function createResetSplitsButton() {
-	try {
-		const container = document.getElementById('resetSplitsButton');
-		if (!container) return;
-		container.innerHTML = '';
-		const btn = document.createElement('button');
-		btn.type = 'button';
-		btn.id = 'loadSplitsFromStorage';
-		btn.textContent = 'Load Splits from Storage';
-		btn.addEventListener('click', () => {
-			applyFastestRunToSession();
-		});
-		container.appendChild(btn);
-	} catch (e) {
-		// ignore
-	}
+	const container = document.getElementById('resetSplitsButton');
+	if (!container) return;
+	container.innerHTML = '';
+	const btn = document.createElement('button');
+	btn.type = 'button';
+	btn.id = 'loadSplitsFromStorage';
+	btn.textContent = 'Load Splits from Storage';
+	btn.addEventListener('click', () => {
+		applyFastestRunToSession();
+	});
+	container.appendChild(btn);
 }
 
 // I missed processing's map() function so much I wrote my own that I think I stole parts of from stackoverflow, but didn't link to.
@@ -2782,105 +2786,99 @@ async function loadingScreen() {
 	// Display the loading screen
 	ctxReal.drawImage(canvas, 0, 0, cwidth, cheight);
 
-	try {
-		let req = await fetch('data/levels.txt');
-		levelsString = await req.text();
-		loadLevels();
+	let req = await fetch('data/levels.txt');
+	levelsString = await req.text();
+	loadLevels();
 
-		req = await fetch('data/images6.json');
-		let resourceData = await req.json();
+	req = await fetch('data/images6.json');
+	let resourceData = await req.json();
 
-		svgCSBubble = await createImage(resourceData['ui/csbubble/dia.svg']);
-		svgHPRCCrank = await createImage(resourceData['entities/e0035crank.svg']);
-		svgCoin = await createImage(resourceData['wintoken.svg']);
-		svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
-		svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
-		for (let i = 0; i < imgBgs.length; i++) {
-			imgBgs[i] = await createImage(resourceData['bg/bg' + i.toString().padStart(4, '0') + '.png']);
-		}
-		for (let i = 0; i < blockProperties.length; i++) {
-			let id = i.toString().padStart(4, '0');
-			if (blockProperties[i][16] == 1 || (blockProperties[i][15] && blockProperties[i][16] == 0)) {
-				svgTiles[i] = await createImage(resourceData['blocks/b' + id + '.svg']);
-				svgTilesVB[i] = getVB(resourceData['blocks/b' + id + '.svg']);
-			} else if (blockProperties[i][16] > 1) {
-				svgTiles[i] = new Array(blockProperties[i][16]);
-				svgTilesVB[i] = new Array(blockProperties[i][16]);
-				for (let j = 0; j < svgTiles[i].length; j++) {
-					svgTiles[i][j] = await createImage(
-						resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
-					);
-					svgTilesVB[i][j] = getVB(resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
-				}
+	svgCSBubble = await createImage(resourceData['ui/csbubble/dia.svg']);
+	svgHPRCCrank = await createImage(resourceData['entities/e0035crank.svg']);
+	svgCoin = await createImage(resourceData['wintoken.svg']);
+	svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
+	svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
+	for (let i = 0; i < imgBgs.length; i++) {
+		imgBgs[i] = await createImage(resourceData['bg/bg' + i.toString().padStart(4, '0') + '.png']);
+	}
+	for (let i = 0; i < blockProperties.length; i++) {
+		let id = i.toString().padStart(4, '0');
+		if (blockProperties[i][16] == 1 || (blockProperties[i][15] && blockProperties[i][16] == 0)) {
+			svgTiles[i] = await createImage(resourceData['blocks/b' + id + '.svg']);
+			svgTilesVB[i] = getVB(resourceData['blocks/b' + id + '.svg']);
+		} else if (blockProperties[i][16] > 1) {
+			svgTiles[i] = new Array(blockProperties[i][16]);
+			svgTilesVB[i] = new Array(blockProperties[i][16]);
+			for (let j = 0; j < svgTiles[i].length; j++) {
+				svgTiles[i][j] = await createImage(
+					resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
+				);
+				svgTilesVB[i][j] = getVB(resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
 			}
 		}
-		for (let i = 0; i < svgLevers.length; i++) {
-			svgLevers[i] = await createImage(resourceData['blocks/b' + i.toString().padStart(2, '0') + 'lever.svg']);
-		}
-		for (let i = 0; i < svgShadows.length; i++) {
-			svgShadows[i] = await createImage(resourceData['shadows/s' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		for (let i = 0; i < svgTileBorders.length; i++) {
-			svgTileBorders[i] = await createImage(resourceData['borders/tb' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		for (let i = 0; i < charD.length; i++) {
-			let id = i.toString().padStart(4, '0');
-			if (charD[i][7] < 1) continue;
-			else if (charD[i][7] == 1) {
-				svgChars[i] = await createImage(resourceData['entities/e' + id + '.svg']);
-				svgCharsVB[i] = getVB(resourceData['entities/e' + id + '.svg']);
-			} else {
-				svgChars[i] = new Array(charD[i][7]);
-				svgCharsVB[i] = new Array(charD[i][7]);
-				for (let j = 0; j < svgChars[i].length; j++) {
-					svgChars[i][j] = await createImage(
-						resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
-					);
-					svgCharsVB[i][j] = getVB(resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
-				}
+	}
+	for (let i = 0; i < svgLevers.length; i++) {
+		svgLevers[i] = await createImage(resourceData['blocks/b' + i.toString().padStart(2, '0') + 'lever.svg']);
+	}
+	for (let i = 0; i < svgShadows.length; i++) {
+		svgShadows[i] = await createImage(resourceData['shadows/s' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	for (let i = 0; i < svgTileBorders.length; i++) {
+		svgTileBorders[i] = await createImage(resourceData['borders/tb' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	for (let i = 0; i < charD.length; i++) {
+		let id = i.toString().padStart(4, '0');
+		if (charD[i][7] < 1) continue;
+		else if (charD[i][7] == 1) {
+			svgChars[i] = await createImage(resourceData['entities/e' + id + '.svg']);
+			svgCharsVB[i] = getVB(resourceData['entities/e' + id + '.svg']);
+		} else {
+			svgChars[i] = new Array(charD[i][7]);
+			svgCharsVB[i] = new Array(charD[i][7]);
+			for (let j = 0; j < svgChars[i].length; j++) {
+				svgChars[i][j] = await createImage(
+					resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
+				);
+				svgCharsVB[i][j] = getVB(resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
 			}
 		}
-		for (let i = 0; i < svgBodyParts.length; i++) {
-			svgBodyParts[i] = await createImage(resourceData['bodyparts/bp' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		for (let i = 0; i < svgHPRCBubble.length; i++) {
-			svgHPRCBubble[i] = await createImage(
-				resourceData['ui/hprcbubble/hprcbubble' + i.toString().padStart(4, '0') + '.svg']
-			);
-		}
-		for (let i = 0; i < svgCoinGet.length; i++) {
-			svgCoinGet[i] = await createImage(resourceData['effects/wtgetf' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		for (let i = 0; i < svgFire.length; i++) {
-			svgFire[i] = await createImage(resourceData['effects/fire' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		for (let i = 0; i < svgBurst.length; i++) {
-			svgBurst[i] = await createImage(resourceData['effects/burst' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		for (let i = 0; i < svgAcidDrop.length; i++) {
-			svgAcidDrop[i] = await createImage(resourceData['effects/aciddrop' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		svgMenu0 = await createImage(resourceData['menu0.svg']);
-		svgMenuBg = await createImage('visuals/5blazit_menu_bg.png');
-		svgMenuOverlay = await createImage('visuals/5blazit_menu_overlay.png');
-		svgMenu2 = await createImage(resourceData['menu2.svg']);
-		svgMenu6 = await createImage(resourceData['menu6.svg']);
-		svgMenu2border = await createImage(resourceData['menu2border.svg']);
-		svgMenu2borderimg = await createImage(resourceData['menu2borderimg.png']);
-		preMenuBG = await createImage(resourceData['premenubg.png']);
-		for (let i = 0; i < svgTools.length; i++) {
-			svgTools[i] = await createImage(resourceData['lc/tool' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		for (let i = 0; i < svgMyLevelsIcons.length; i++) {
-			svgMyLevelsIcons[i] = await createImage(resourceData['ui/mylevels/icon' + i.toString().padStart(4, '0') + '.svg']);
-			// console.log(resourceData['ui/mylevels/icon' + i.toString().padStart(4, '0') + '.svg']);
-		}
-		setup();
-	} catch (e) {
-		loadingMessage = "[please reload the page]";
-		ctx.fillText(loadingMessage, cwidth / 2, cheight / 2);
-		ctxReal.drawImage(canvas, 0, 0, cwidth, cheight);
-	}	
+	}
+	for (let i = 0; i < svgBodyParts.length; i++) {
+		svgBodyParts[i] = await createImage(resourceData['bodyparts/bp' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	for (let i = 0; i < svgHPRCBubble.length; i++) {
+		svgHPRCBubble[i] = await createImage(
+			resourceData['ui/hprcbubble/hprcbubble' + i.toString().padStart(4, '0') + '.svg']
+		);
+	}
+	for (let i = 0; i < svgCoinGet.length; i++) {
+		svgCoinGet[i] = await createImage(resourceData['effects/wtgetf' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	for (let i = 0; i < svgFire.length; i++) {
+		svgFire[i] = await createImage(resourceData['effects/fire' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	for (let i = 0; i < svgBurst.length; i++) {
+		svgBurst[i] = await createImage(resourceData['effects/burst' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	for (let i = 0; i < svgAcidDrop.length; i++) {
+		svgAcidDrop[i] = await createImage(resourceData['effects/aciddrop' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	svgMenu0 = await createImage(resourceData['menu0.svg']);
+	svgMenuBg = await createImage('visuals/5blazit_menu_bg.png');
+	svgMenuOverlay = await createImage('visuals/5blazit_menu_overlay.png');
+	svgMenu2 = await createImage(resourceData['menu2.svg']);
+	svgMenu6 = await createImage(resourceData['menu6.svg']);
+	svgMenu2border = await createImage(resourceData['menu2border.svg']);
+	svgMenu2borderimg = await createImage(resourceData['menu2borderimg.png']);
+	preMenuBG = await createImage(resourceData['premenubg.png']);
+	for (let i = 0; i < svgTools.length; i++) {
+		svgTools[i] = await createImage(resourceData['lc/tool' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	for (let i = 0; i < svgMyLevelsIcons.length; i++) {
+		svgMyLevelsIcons[i] = await createImage(resourceData['ui/mylevels/icon' + i.toString().padStart(4, '0') + '.svg']);
+		// console.log(resourceData['ui/mylevels/icon' + i.toString().padStart(4, '0') + '.svg']);
+	}
+	setup();
 }
 
 window.onload = function () {
@@ -4166,7 +4164,6 @@ function playLevel(i) {
 	if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] == null) {
 		// store session-based timestamp (milliseconds) so splits are based on session timer
 		sessionTimerLastEntry = getSessionTimerMs();
-		// try { document.getElementById('TEMP').textContent = sessionTimerLastEntry; } catch (e) {}
 	}
 	currentLevel = i;
 	wipeTimer = 30;
@@ -8740,7 +8737,8 @@ function createLivesplitEntries() {
 		// If this is the special 100% split show its label, otherwise show level name
 		if (i === 'missed') {
 			name.textContent = 'Missed win tokens';
-		} else {
+		}
+		else {
 			name.textContent = 'Level ' + (i + 1) + (levelName && levelName[i] ? ': ' + levelName[i] : '');
 		}
 
@@ -8755,16 +8753,16 @@ function createLivesplitEntries() {
 		// Prefer session split (this run) if present, otherwise show fastest run, then prev/best or em dash
 		if (typeof sessionSplitTimes !== 'undefined' && sessionSplitTimes[i] != null) {
 			time.textContent = toMMSSms(sessionSplitTimes[i]);
-		} else {
+		}
+		else {
 			const cumulArr = ensureCumulArrayForCurrentCategory();
 			if (typeof i === 'number' && Array.isArray(cumulArr) && cumulArr[i] != null) {
 				// Calculate split from fastest run: cumul[i] - cumul[i-1]
 				const prevCumul = (i > 0 && cumulArr[i - 1] != null) ? cumulArr[i - 1] : 0;
 				const split = cumulArr[i] - prevCumul;
 				time.textContent = toMMSSms(split);
-			} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
-				time.textContent = toMMSSms(parseInt(prev[i], 10));
-			} else {
+			} 
+			else {
 				time.textContent = '\u2014';
 			}
 		}
@@ -8781,9 +8779,8 @@ function createLivesplitEntries() {
 			const cumulArr = ensureCumulArrayForCurrentCategory();
 			if (typeof i === 'number' && Array.isArray(cumulArr) && cumulArr[i] != null && cumulArr[i] > 0) {
 				cumulTime.textContent = toMMSSms(cumulArr[i]);
-			} else if (typeof prev !== 'undefined' && prev[i] != undefined && prev[i] !== 'NaN') {
-				cumulTime.textContent = toMMSSms(parseInt(prev[i], 10));
-			} else {
+			}
+			else {
 				cumulTime.textContent = '\u2014';
 			}
 		}
@@ -9010,15 +9007,15 @@ function draw() {
 						sessionEntryTimes[currentLevel] = performance.now();
 					}
 					updateSplitTime(currentLevel);
+					currSplit++;
 					// update sessionTimerLastEntry so the next split measures from this point
 					sessionTimerLastEntry = sessionNow;
-					try { document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry; } catch (e) {}
+					document.getElementById('sessionTimerLastEntry').textContent = sessionTimerLastEntry;
 					
 					// Stop session timer when level 52 is completed (last level in run - 1)
 					if (currentLevel === 51 && splitCategory.name !== '100%') {
 						stopSessionTimer();
 					}
-					// TODO: this is untested
 					else if (splitCategory.name === '100%' && coins == 52) {
 						// Autosplit the 100% 'missed' entry manually
 						const sessionNow = getSessionTimerMs();
@@ -9030,23 +9027,6 @@ function draw() {
 						updateSplitTime('missed');
 
 						stopSessionTimer();
-					}
-
-					// Auto-scroll livesplit entries one entry to the right so the newly-completed split becomes visible
-					const container = document.getElementById('livesplit-entries');
-					if (container) {
-						const firstEntry = container.querySelector('.livesplit-entry');
-						if (firstEntry && levelProgress > splitCategory.start && sessionTimerRunning === true) {
-							const style = window.getComputedStyle(firstEntry);
-							const marginRight = parseFloat(style.marginRight) || 0;
-							
-							const amount = Math.round(firstEntry.getBoundingClientRect().width + 4.1);
-							if (typeof container.scrollBy === 'function') {
-								container.scrollBy({ left: amount, behavior: 'smooth' });
-							} else {
-								container.scrollLeft += amount;
-							}
-						}
 					}
 
 					if (!freezeLevelTimer) {
