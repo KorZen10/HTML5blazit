@@ -5321,6 +5321,7 @@ function checkButton2(i, bypass) {
 }
 
 function leverSwitch(j) {
+	console.log("leverSwitch");
 	for (let z = 0; z < switchable[j].length; z++) {
 		let x = switchable[Math.min(j, 5)][z][0];
 		let y = switchable[Math.min(j, 5)][z][1];
@@ -5665,6 +5666,8 @@ function onlyConveyorsUnder(i) {
 }
 // 
 function startCutScene() {
+	console.log("cutScene: " + cutScene);
+	console.log("toSeeCS: " + toSeeCS);
 	if (cutScene == 0) {
 		if (toSeeCS) {
 			cutScene = 1;
@@ -11686,7 +11689,9 @@ let tileFramesBackup = null; // things like lever and button positions
 let controlBackup = 0; // which character is being controlled
 let recoverTimerBackup = 0; // death fade-out
 let recoverBackup = false;
-let recover2Backup = 0;
+let recover2Backup = null;
+let cutSceneBackup = null; // for dialogue
+let toSeeCSBackup = null;
 
 let levelHasBeenSaved = false; // check for whether a load is valid here or not
 function saveState() {
@@ -11715,6 +11720,9 @@ function saveState() {
 
 	recoverBackup = structuredClone(recover);
 	recover2Backup = structuredClone(recover2);
+
+	cutSceneBackup = structuredClone(cutScene);
+	toSeeCSBackup = structuredClone(toSeeCS);
 }
 
 function loadState() {
@@ -11734,7 +11742,7 @@ function loadState() {
 	}
 
 	// restore the tile states
-	tileFrames = tileFramesBackup;
+	if (tileFramesBackup !== null) tileFrames = tileFramesBackup;
 
 	// Restore characters from their backups
 	for (let i = 0; i < charCount; i++) {
@@ -11755,12 +11763,19 @@ function loadState() {
 		doorLightFadeDire[i] = 0;
 	}
 
-	recover2 = recover2Backup;
+	if (recoverBackup !== null) recover = recoverBackup;
+	if (recover2Backup !== null) recover2 = recover2Backup;
+	if (cutSceneBackup !== null) cutScene = cutSceneBackup;
+	if (toSeeCSBackup !== null) toSeeCS = toSeeCSBackup;
 
 	// advance to next frame so that we can actually see the load happen
 	advanceFrame();
 	// nice try
 	resetSessionTimer();
+
+	// console.log(char[1]);
+	// console.log("switchable:",switchable);
+	// console.log("switches:",switches);
 }
 
 // Explore API Stuff

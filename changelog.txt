@@ -1,13 +1,14 @@
 THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
-1) Make a vertical Livesplit layout
-2) Add losing/gaining time colors in Livesplit
-3) Fix stay-after-finish positions resetting before wipe
+1) fix lever position not updating after 2 load states
+2) Make a vertical Livesplit layout
+3) Add losing/gaining time colors in Livesplit
+4) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
 02/19/26:
--Fixed HPRC recovery savestate bug (I forgot to load a variable) 
+-Fixed HPRC recovery savestate bug (I forgot to load a variable) and dialogue savestate bug (I forgot to load 2 variables)
 
 02/15/26:
 -Added additional "Missed win tokens" split to 100% autosplitter. Now, if you're running 100% and missed any win tokens, your run won't immediately end when you beat level 52.
