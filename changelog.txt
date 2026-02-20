@@ -8,6 +8,7 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
 02/19/26:
+-Added gaining/losing colors to Livesplit delta!
 -Fixed HPRC recovery savestate bug (I forgot to load a variable) and dialogue savestate bug (I forgot to load 2 variables)
 
 02/15/26:

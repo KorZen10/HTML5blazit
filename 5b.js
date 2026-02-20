@@ -2491,6 +2491,7 @@ function resetSessionTimer() {
 	sessionTimerRunning = false;
 	currSplit = 0;
 	prevSplitSessionTime = 0;
+	prevDelta = null;
 	// Clear session arrays so that updateSplitTime falls back to fastest run data
 	sessionSplitTimes.fill(null);
 	sessionCumulTimes.fill(null);
@@ -2528,6 +2529,7 @@ function clearFastestRun() {
 }
 
 let prevSplitSessionTime = null;
+let prevDelta = null;
 function updateSplitTime(levelId) {
 	// Update the entry time on the left side using previous split session time value
 	const splitEl = document.getElementById('split-time-' + levelId);
@@ -2579,15 +2581,21 @@ function updateSplitTime(levelId) {
 		deltaEl.textContent = sign + toMMSSms(Math.abs(delta));
 
 		// Color gold if this split is the best individual, else red/green
-		if (sessionSplitTimes[levelId] < bestIndividualSplits[levelId]) {
-			deltaEl.style.color = 'gold';
-		} else {
-			deltaEl.style.color = delta > 0 ? 'red' : '#00FF00';
+		if (sessionSplitTimes[levelId] < bestIndividualSplits[levelId]) deltaEl.style.color = 'gold';
+		else if (delta > 0) {
+			if (prevDelta !== null && delta <= prevDelta) deltaEl.style.color = '#FF9999';
+			else deltaEl.style.color = '#FF0000';
 		}
-	} else {
+		else {
+			if (prevDelta !== null && delta > prevDelta) deltaEl.style.color = '#99FF99';
+			else deltaEl.style.color = '#00FF00';
+		}
+	}
+	else {
 		deltaEl.textContent = '';
 		deltaEl.style.color = '#999'; // default color
 	}
+	prevDelta = delta;
 
 	// Auto-scroll livesplit entries one entry to the right so the newly-completed split becomes visible
 	const container = document.getElementById('livesplit-entries');
@@ -5691,15 +5699,23 @@ function startCutScene() {
 		}
 	}
 	
-	// Start/end run on dialogue in level 19 (index 18)
-	if (currentLevel === 18) {
-		if (splitCategory.name === 'booksegment') stopSessionTimer();
-		else if (splitCategory.name === 'matchsegment') startSessionTimer();
-	}
-	// Or start/end run on dialogue in level 42 (index 41)
-	else if (currentLevel === 41) {
-		if (splitCategory.name === 'matchsegment') stopSessionTimer();
-		else if (splitCategory.name === 'icecubesegment') startSessionTimer();
+	if (sessionTimerRunning) {
+		// Start/end run on dialogue in level 19 (index 18)
+		if (currentLevel === 18) {
+			if (splitCategory.name === 'booksegment') {
+				updateSplitTime(18);
+				stopSessionTimer();
+			}
+			else if (splitCategory.name === 'matchsegment') startSessionTimer();
+		}
+		// Or start/end run on dialogue in level 42 (index 41)
+		else if (currentLevel === 41) {
+			if (splitCategory.name === 'matchsegment') {
+				updateSplitTime(41);
+				stopSessionTimer();
+			}
+			else if (splitCategory.name === 'icecubesegment') startSessionTimer();
+		}
 	}
 	// else if (currentLevel === 53) // actually you don't need to handle anything lol
 }
@@ -11588,7 +11604,7 @@ let now;
 let then = window.performance.now();
 let lastFrameReq = then;
 let interval = 1000 / fps;
-let delta;
+let globalDelta;
 
 
 function rAF60fps() {
@@ -11598,9 +11614,9 @@ function rAF60fps() {
 	}
 	else {
 		now = window.performance.now();
-		delta = now - then;
-		if (delta > interval) {
-			then = now - (delta % interval);
+		globalDelta = now - then;
+		if (globalDelta > interval) {
+			then = now - (globalDelta % interval);
 			for (let i = 0; i < fps/60; i++) draw();
 		}
 
