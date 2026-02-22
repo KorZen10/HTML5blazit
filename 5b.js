@@ -1,3 +1,4 @@
+// 44 Recreation: Z RU R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R RJ R R R R R R R R R R R R R - - - - - - - - J J RJ RJ RJ R R R R R R R R R R R R RU R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R RJ R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R
 
 /* For testing the performance of any block of code. It averages every 100 runs and prints to the console. To use, simply place the following around the code block you'd like to test:
 performanceTest(()=>{
@@ -5699,23 +5700,21 @@ function startCutScene() {
 		}
 	}
 	
-	if (sessionTimerRunning) {
-		// Start/end run on dialogue in level 19 (index 18)
-		if (currentLevel === 18) {
-			if (splitCategory.name === 'booksegment') {
-				updateSplitTime(18);
-				stopSessionTimer();
-			}
-			else if (splitCategory.name === 'matchsegment') startSessionTimer();
+	// Start/end run on dialogue in level 19 (index 18)
+	if (currentLevel === 18) {
+		if (splitCategory.name === 'booksegment') {
+			updateSplitTime(18);
+			stopSessionTimer();
 		}
-		// Or start/end run on dialogue in level 42 (index 41)
-		else if (currentLevel === 41) {
-			if (splitCategory.name === 'matchsegment') {
-				updateSplitTime(41);
-				stopSessionTimer();
-			}
-			else if (splitCategory.name === 'icecubesegment') startSessionTimer();
+		else if (splitCategory.name === 'matchsegment') startSessionTimer();
+	}
+	// Or start/end run on dialogue in level 42 (index 41)
+	else if (currentLevel === 41) {
+		if (splitCategory.name === 'matchsegment') {
+			updateSplitTime(41);
+			stopSessionTimer();
 		}
+		else if (splitCategory.name === 'icecubesegment') startSessionTimer();
 	}
 	// else if (currentLevel === 53) // actually you don't need to handle anything lol
 }
