@@ -1,5 +1,3 @@
-// 44 Recreation: Z RU R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R RJ R R R R R R R R R R R R R - - - - - - - - J J RJ RJ RJ R R R R R R R R R R R R RU R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R RJ R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R R
-
 /* For testing the performance of any block of code. It averages every 100 runs and prints to the console. To use, simply place the following around the code block you'd like to test:
 performanceTest(()=>{
 }); */
@@ -2607,9 +2605,6 @@ function updateSplitTime(levelId) {
 	if (firstEntry && levelProgress > splitCategory.start && sessionTimerRunning === true) {
 		const amount = Math.round(firstEntry.getBoundingClientRect().width + 4.1);
 		let scrollLoc = amount * currSplit;
-		console.log("scrollLoc:", scrollLoc);
-		console.log("currSplit:", currSplit);
-		console.log("amount:", amount);
 		if (typeof container.scrollBy === 'function') {
 			container.scrollTo({ left: scrollLoc, behavior: 'smooth' });
 		} else {
@@ -3847,7 +3842,8 @@ function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
 	const pressedColor = KEY_PRESS_COLOR_LIST[keyColorIndex];
 
 	const keyCoordinateMatrix = getKeyCoordinateMatrix();
-	ctx.globalAlpha = 0.8;
+	ctx.save();
+	ctx.globalAlpha = alpha;
 	for (var key of Object.keys(keyCoordinateMatrix)) {
 		ctx.fillStyle = _keysDown[key] ? pressedColor : '#666666';
 		// Shift+Enter also highlights the talk key
@@ -3874,12 +3870,100 @@ function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
 	ctx.font = `${24 * scale}px Helvetica`;
 	ctx.fillText((keys[4] && keys[9] && keys[4] === keys[9]) ? '' : (keys[9] || ''), x + 305.00 * scale + 48.00/2 * scale, y + 27.75 * scale);
 	ctx.font = prevFont;
-	ctx.globalAlpha = 1;
+	ctx.restore();
 }
 
-var levelTimerOffset, levelKeysOffset;
+// Draw the input-history UI box: short wide gray rectangle with 19 monospace characters
+function redrawInputHistory(historyStr, x, y, scale = 0.6, alpha = 0.45) {
+	// legacy stuffs:
+	// const keysHeight = 130.00 * scale;
+	// const boxX = x + 130;
+	// const boxY = y + keysHeight + 6 * scale;
+
+	// respect the history visibility flag (toggle O)
+	const histFlag = (typeof cachedShowHistory !== 'undefined' && cachedShowHistory !== null) ? cachedShowHistory : (bfdia5b.getItem('timerMod.showHistory') || '1');
+	if (histFlag == '0') return;
+	const chars = 19;
+	const padding = 6 * scale;
+	const prevFont = ctx.font;
+	const fontSize = Math.max(12, Math.round(20 * scale));
+	ctx.save();
+	ctx.globalAlpha = alpha;
+	ctx.font = `${fontSize}px monospace`;
+	const charW = ctx.measureText('M').width;
+	const w = Math.ceil(charW * chars + padding * 2);
+	const h = Math.ceil(fontSize + padding * 2);
+
+	// if x is null/undefined, position the box near the right edge with a small margin
+	if (x === null || x === undefined) {
+		const margin = Math.round(12 * scale);
+		x = Math.max(0, (typeof cwidth !== 'undefined' ? cwidth : 960) - w - margin);
+	}
+
+	// background box (no border)
+	ctx.fillStyle = '#6f6f6f';
+	ctx.fillRect(x, y, w, h);
+
+	// draw the history text (rightmost = newest)
+	ctx.fillStyle = '#ffffff';
+	ctx.textAlign = 'left';
+	ctx.textBaseline = 'middle';
+	const display = (historyStr || ' '.repeat(chars)).slice(-chars).padStart(chars, ' ');
+	ctx.fillText(display, x + padding, y + h/2);
+	ctx.restore();
+	ctx.font = prevFont;
+}
+
+let inputHistory = [null, null, null, null, null, null, null, null, null, null]; // FIFO queue, older->newer
+let inputHistoryFullness = 0; // 0 is empty, 10 (maximum) means input occurred on the most recent frame
+let inputHistoryIsActive = false;
+let inputHistoryStr = ""; // 19-char display string for UI (older->newer, rightmost is newest)
+function handleInputHistory() {
+	// Build current input string (RLUDJZE)
+	let str = "";
+	if (_keysDown[keyMappings.jump]) str += "J";
+	if (_keysDown[keyMappings.switch]) str += "Z";
+	if (_keysDown[keyMappings.reset]) str += "r";
+	if (_keysDown[keyMappings.left]) str += "L";
+	if (_keysDown[keyMappings.right]) str += "R";
+	if (_keysDown[keyMappings.grab]) str += "U";
+	if (_keysDown[keyMappings.grabExtra] && keyMappings.grabExtra !== keyMappings.grab) str += "u";
+	if (_keysDown[keyMappings.drop]) str += "D";
+	if (_keysDown[keyMappings.talk]) str += "E";
+
+	// If no input and we're not currently active, do nothing
+	if (str.length === 0 && !inputHistoryIsActive) {
+		return;
+	}
+
+	// If input is given: activate history, reset fullness counter, and record
+	if (str.length > 0) {
+		inputHistoryIsActive = true;
+		inputHistoryFullness = 10;
+		inputHistory.push(str);
+	}
+	// No input but history is active: record a null and decrement fullness
+	else {
+		inputHistory.push(null);
+		inputHistoryFullness--;
+		if (inputHistoryFullness <= 0) {
+			inputHistoryIsActive = false;
+			inputHistoryFullness = 0;
+		}
+	}
+
+	// Keep only the last 10 entries
+	while (inputHistory.length > 10) inputHistory.shift();
+
+	// Build a display string: join entries with single spaces, map null -> ' '
+	const joined = inputHistory.map(e => e === null ? '-' : e).join(' ');
+	// Keep the most recent 19 characters, pad left to always be 19 chars
+	inputHistoryStr = joined.slice(-19).padStart(19, ' ');
+}
+
+var levelTimerOffset, levelKeysOffset, levelHistoryOffset;
 var lastHover = 't';
-var tPress = false, yPress = false, uPress = false, iPress = false;
+var tPress = false, yPress = false, oPress = false, iPress = false, uPress = false;
 function runLayoutEditor() {
 	inLayoutEditor = true;
 	ctx.fillStyle = '#245A98';
@@ -3896,6 +3980,9 @@ function runLayoutEditor() {
 		cachedLevelKeysPos = [695, 3];
 		cachedLevelKeysScale = 0.6;
 		cachedLevelKeysAlpha = 0.45;
+		cachedHistoryPos = [818, 87];
+		cachedHistoryScale = 0.6;
+		cachedHistoryAlpha = 0.45;
 		bfdia5b.setItem('timerMod.showTimer', '1');
 		bfdia5b.setItem('timerMod.showKeys', '1');
 		bfdia5b.setItem('timerMod.levelTimerPos', '6,6');
@@ -3904,24 +3991,37 @@ function runLayoutEditor() {
 		bfdia5b.setItem('timerMod.levelKeysPos', '695,3');
 		bfdia5b.setItem('timerMod.levelKeysScale', '0.6');
 		bfdia5b.setItem('timerMod.levelKeysAlpha', '0.45');
+		bfdia5b.setItem('timerMod.historyPos', '818,87');
+		bfdia5b.setItem('timerMod.historyScale', '0.6');
+		bfdia5b.setItem('timerMod.historyAlpha', '0.45');
 		levelTimerOffset = undefined;
 	}
-	if ((_keysDown[84] || (tPress = false)) && !tPress && (tPress = true)) bfdia5b.setItem('timerMod.showTimer', +!+(bfdia5b.getItem('timerMod.showTimer') || 1));
-	if ((_keysDown[89] || (yPress = false)) && !yPress && (yPress = true)) bfdia5b.setItem('timerMod.showKeys', +!+(bfdia5b.getItem('timerMod.showKeys') || 1));
-
-	// Cycle pressed-key display color (U = previous, I = next)
-	if ((_keysDown[85] || (iPress = false)) && !iPress && (iPress = true)) {
+	if ((_keysDown[84] || (tPress = false)) && !tPress && (tPress = true)) {
+		const newVal = +!+(bfdia5b.getItem('timerMod.showTimer') || 1) + '';
+		bfdia5b.setItem('timerMod.showTimer', newVal);
+		cachedShowTimer = newVal;
+	}
+	if ((_keysDown[89] || (yPress = false)) && !yPress && (yPress = true)) {
+		const newVal = +!+(bfdia5b.getItem('timerMod.showKeys') || 1) + '';
+		bfdia5b.setItem('timerMod.showKeys', newVal);
+		cachedShowKeys = newVal;
+	}
+	if ((_keysDown[85] || (uPress = false)) && !uPress && (uPress = true)) bfdia5b.setItem('timerMod.showHistory', +!+(bfdia5b.getItem('timerMod.showHistory') || 1));
+	
+	// Cycle pressed-key display color (I = previous, O = next)
+	if ((_keysDown[73] || (iPress = false)) && !iPress && (iPress = true)) {
 		let idx = parseInt(bfdia5b.getItem('timerMod.keyColorIndex'));
 		if (isNaN(idx)) idx = 0;
 		idx = (idx - 1 + KEY_PRESS_COLOR_LIST.length) % KEY_PRESS_COLOR_LIST.length;
 		bfdia5b.setItem('timerMod.keyColorIndex', idx);
 	}
-	if ((_keysDown[73] || (uPress = false)) && !uPress && (uPress = true)) {
+	if ((_keysDown[79] || (oPress = false)) && !oPress && (oPress = true)) {
 		let idx = parseInt(bfdia5b.getItem('timerMod.keyColorIndex'));
 		if (isNaN(idx)) idx = 0;
 		idx = (idx + 1) % KEY_PRESS_COLOR_LIST.length;
 		bfdia5b.setItem('timerMod.keyColorIndex', idx);
 	}
+
 
 	var levelTimerX = parseFloat(bfdia5b.getItem('timerMod.levelTimerPos')?.split(',')[0]) || 6;
 	var levelTimerY = parseFloat(bfdia5b.getItem('timerMod.levelTimerPos')?.split(',')[1]) || 6;
@@ -3932,18 +4032,43 @@ function runLayoutEditor() {
 	var levelKeysY = parseFloat(bfdia5b.getItem('timerMod.levelKeysPos')?.split(',')[1]) || 3;
 	var levelKeysScale = parseFloat(bfdia5b.getItem('timerMod.levelKeysScale')) || 0.6;
 	var levelKeysAlpha = parseFloat(bfdia5b.getItem('timerMod.levelKeysAlpha')) || 0.45;
-	var keysHover = onRect(_xmouse, _ymouse, levelKeysX - 16, levelKeysY, 459.00 * levelKeysScale, 130.00 * levelKeysScale);
-	onScrollbar = timerHover || keysHover;
-	if (timerHover && !keysHover && !draggingScrollbar) lastHover = 't';
-	else if (keysHover && !timerHover && !draggingScrollbar) lastHover = 'k';
+	var historyX = parseFloat(bfdia5b.getItem('timerMod.historyPos')?.split(',')[0]) || cachedHistoryPos[0];
+	var historyY = parseFloat(bfdia5b.getItem('timerMod.historyPos')?.split(',')[1]) || cachedHistoryPos[1];
+	var historyScale = parseFloat(bfdia5b.getItem('timerMod.historyScale')) || cachedHistoryScale;
+	var historyAlpha = parseFloat(bfdia5b.getItem('timerMod.historyAlpha')) || cachedHistoryAlpha;
 
-	if (((timerHover && !keysHover) || draggingScrollbar) && lastHover == 't') {
+	// compute history box size
+	// TODO position is weird when scaling down
+	const ihChars = 19;
+	const ihPadding = 6 * historyScale;
+	const ihFontSize = Math.max(12, Math.round(20 * historyScale));
+	const __prevFont_for_ih = ctx.font;
+	ctx.font = `${ihFontSize}px monospace`;
+	const ihCharW = ctx.measureText('M').width;
+	ctx.font = __prevFont_for_ih;
+	const ihW = Math.ceil(ihCharW * ihChars + ihPadding * 2);
+	const ihH = Math.ceil(ihFontSize + ihPadding * 2);
+
+	const clamp = (num) => Math.min(Math.max(num, 0.3), 1);
+
+	var keysHover = onRect(_xmouse, _ymouse, levelKeysX - 16, levelKeysY, 459.00 * levelKeysScale, 130.00 * levelKeysScale);
+	var historyHover = onRect(_xmouse, _ymouse, historyX, historyY, ihW, ihH);
+	onScrollbar = timerHover || keysHover || historyHover;
+	if (timerHover && !keysHover && !historyHover && !draggingScrollbar) lastHover = 't';
+	else if (keysHover && !timerHover && !historyHover && !draggingScrollbar) lastHover = 'k';
+	else if (historyHover && !timerHover && !keysHover && !draggingScrollbar) lastHover = 'h';
+
+	if (((timerHover && !keysHover && !historyHover) || draggingScrollbar) && lastHover == 't') {
 		if (!levelTimerOffset) levelTimerOffset = [ (_xmouse - levelTimerX) / levelTimerScale, (_ymouse - levelTimerY) / levelTimerScale ];
 
-		if (_keysDown[38]) levelTimerScale += 0.05;
-		else if (_keysDown[40]) levelTimerScale = Math.max(0.1, levelTimerScale - 0.05);
-		if (_keysDown[39]) levelTimerAlpha = Math.min(1, levelTimerAlpha + 0.05);
-		else if (_keysDown[37]) levelTimerAlpha = Math.max(0.1, levelTimerAlpha - 0.05);
+		if (_keysDown[38]) levelTimerScale += 0.02;
+		else if (_keysDown[40]) levelTimerScale -= 0.02;
+		if (_keysDown[39]) levelTimerAlpha += 0.02;
+		else if (_keysDown[37]) levelTimerAlpha -= 0.02;
+
+		// clamp timer values to sensible range
+		levelTimerScale = clamp(levelTimerScale);
+		levelTimerAlpha = clamp(levelTimerAlpha);
 
 		if ((mouseIsDown && (draggingScrollbar = true)) || _keysDown[38] || _keysDown[40]) {
 			levelTimerX = _xmouse - levelTimerOffset[0] * levelTimerScale;
@@ -3957,21 +4082,41 @@ function runLayoutEditor() {
 	bfdia5b.setItem('timerMod.levelTimerPos', `${levelTimerX.toFixed(3)},${levelTimerY.toFixed(3)}`);
 	bfdia5b.setItem('timerMod.levelTimerScale', levelTimerScale.toFixed(2));
 	bfdia5b.setItem('timerMod.levelTimerAlpha', levelTimerAlpha.toFixed(2));
+	
+	levelKeysScale = clamp(levelKeysScale);
+	levelKeysAlpha = clamp(levelKeysAlpha);
 
-	if (((keysHover && !timerHover) || draggingScrollbar) && lastHover == 'k') {
+	if (((keysHover && !timerHover && !historyHover) || draggingScrollbar) && lastHover == 'k') {
 		if (!levelKeysOffset) levelKeysOffset = [ (_xmouse - levelKeysX) / levelKeysScale, (_ymouse - levelKeysY) / levelKeysScale ];
-
-		if (_keysDown[38]) levelKeysScale += 0.05;
-		else if (_keysDown[40]) levelKeysScale = Math.max(0.1, levelKeysScale - 0.05);
-		if (_keysDown[39]) levelKeysAlpha = Math.min(1, levelKeysAlpha + 0.05);
-		else if (_keysDown[37]) levelKeysAlpha = Math.max(0.1, levelKeysAlpha - 0.05);
+		
+		if (_keysDown[38]) levelKeysScale += 0.02;
+		else if (_keysDown[40]) levelKeysScale -= 0.02;
+		if (_keysDown[39]) levelKeysAlpha += 0.02;
+		else if (_keysDown[37]) levelKeysAlpha -= 0.02;
 
 		if ((mouseIsDown && (draggingScrollbar = true)) || _keysDown[38] || _keysDown[40]) {
 			levelKeysX = _xmouse - levelKeysOffset[0] * levelKeysScale
 			levelKeysY = _ymouse - levelKeysOffset[1] * levelKeysScale;
 		} else levelKeysOffset = draggingScrollbar = false;
 	}
-	redrawLevelKeys([ '[Y to hide]', '', '', '', '', '', '[U/I for colors]', '' ], levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha * (keysHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
+	// handle history dragging/scaling/opacity
+	if (((historyHover && !timerHover && !keysHover) || draggingScrollbar) && lastHover == 'h') {
+		if (!levelHistoryOffset) levelHistoryOffset = [ (_xmouse - historyX) / historyScale, (_ymouse - historyY) / historyScale ];
+
+		if (_keysDown[38]) historyScale += 0.02;
+		else if (_keysDown[40]) historyScale -= 0.02;
+		if (_keysDown[39]) historyAlpha += 0.02;
+		else if (_keysDown[37]) historyAlpha -= 0.02;
+
+		historyScale = clamp(historyScale);
+		historyAlpha = clamp(historyAlpha);
+
+		if ((mouseIsDown && (draggingScrollbar = true)) || _keysDown[38] || _keysDown[40]) {
+			historyX = _xmouse - levelHistoryOffset[0] * historyScale;
+			historyY = _ymouse - levelHistoryOffset[1] * historyScale;
+		} else levelHistoryOffset = draggingScrollbar = false;
+	}
+	redrawLevelKeys([ '[Y to hide]', '', '', '', '', '', '[I/O for colors]', '' ], levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha * (keysHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
 	cachedLevelKeysPos = [levelKeysX, levelKeysY];
 	cachedLevelKeysScale = levelKeysScale;
 	cachedLevelKeysAlpha = levelKeysAlpha;
@@ -3979,8 +4124,15 @@ function runLayoutEditor() {
 	bfdia5b.setItem('timerMod.levelKeysScale', levelKeysScale.toFixed(2));
 	bfdia5b.setItem('timerMod.levelKeysAlpha', levelKeysAlpha.toFixed(2));
 
-	// TODO speedrun mod key remap instructions:
-	// 1) figure out how to make the key remap prompts visible (look into the options page for this) ✅
+	if (bfdia5b.getItem('timerMod.showHistory') != '0') {
+		redrawInputHistory("    [U to hide]    ", historyX, historyY, historyScale, historyAlpha * (historyHover ? (mouseIsDown ? 0.5 : 0.75) : 1));
+		bfdia5b.setItem('timerMod.historyPos', `${historyX.toFixed(3)},${historyY.toFixed(3)}`);
+		bfdia5b.setItem('timerMod.historyScale', historyScale.toFixed(2));
+		bfdia5b.setItem('timerMod.historyAlpha', historyAlpha.toFixed(2));
+		cachedHistoryPos = [historyX, historyY];
+		cachedHistoryScale = historyScale;
+		cachedHistoryAlpha = historyAlpha;
+	}
 
 	// Key remapping panel: centered on screen. Display each action name and its editable mapping box.
 	const rowH = 40;
@@ -5330,7 +5482,6 @@ function checkButton2(i, bypass) {
 }
 
 function leverSwitch(j) {
-	console.log("leverSwitch");
 	for (let z = 0; z < switchable[j].length; z++) {
 		let x = switchable[Math.min(j, 5)][z][0];
 		let y = switchable[Math.min(j, 5)][z][1];
@@ -5675,8 +5826,6 @@ function onlyConveyorsUnder(i) {
 }
 // 
 function startCutScene() {
-	console.log("cutScene: " + cutScene);
-	console.log("toSeeCS: " + toSeeCS);
 	if (cutScene == 0) {
 		if (toSeeCS) {
 			cutScene = 1;
@@ -5703,6 +5852,7 @@ function startCutScene() {
 	// Start/end run on dialogue in level 19 (index 18)
 	if (currentLevel === 18) {
 		if (splitCategory.name === 'booksegment') {
+			updateSessionTimeValues();
 			updateSplitTime(18);
 			stopSessionTimer();
 		}
@@ -5711,6 +5861,7 @@ function startCutScene() {
 	// Or start/end run on dialogue in level 42 (index 41)
 	else if (currentLevel === 41) {
 		if (splitCategory.name === 'matchsegment') {
+			updateSessionTimeValues();
 			updateSplitTime(41);
 			stopSessionTimer();
 		}
@@ -8924,17 +9075,22 @@ function setup() {
 // Cached localStorage values for timer/keys display (avoids reading storage every frame)
 let cachedShowTimer = null;
 let cachedShowKeys = null;
+let cachedShowHistory = null;
 let cachedLevelTimerPos = [6, 6];
 let cachedLevelTimerScale = 0.7;
 let cachedLevelTimerAlpha = 0.6;
 let cachedLevelKeysPos = [695, 3];
 let cachedLevelKeysScale = 0.6;
 let cachedLevelKeysAlpha = 0.45;
+let cachedHistoryPos = [820, 85];
+let cachedHistoryScale = 0.6;
+let cachedHistoryAlpha = 0.45;
 
 // Initialize cached values from localStorage
 function initTimerKeysCache() {
 	cachedShowTimer = bfdia5b.getItem('timerMod.showTimer') || '1';
 	cachedShowKeys = bfdia5b.getItem('timerMod.showKeys') || '1';
+	cachedShowHistory = bfdia5b.getItem('timerMod.showHistory') || '1';
 	const timerPos = bfdia5b.getItem('timerMod.levelTimerPos')?.split(',');
 	if (timerPos) {
 		cachedLevelTimerPos = [parseFloat(timerPos[0]) || 6, parseFloat(timerPos[1]) || 6];
@@ -8947,6 +9103,37 @@ function initTimerKeysCache() {
 	}
 	cachedLevelKeysScale = parseFloat(bfdia5b.getItem('timerMod.levelKeysScale')) || 0.6;
 	cachedLevelKeysAlpha = parseFloat(bfdia5b.getItem('timerMod.levelKeysAlpha')) || 0.45;
+	const histPos = bfdia5b.getItem('timerMod.historyPos')?.split(',');
+	if (histPos) {
+		cachedHistoryPos = [parseFloat(histPos[0]) || 820, parseFloat(histPos[1]) || 85];
+	}
+	cachedHistoryScale = parseFloat(bfdia5b.getItem('timerMod.historyScale')) || 0.6;
+	cachedHistoryAlpha = parseFloat(bfdia5b.getItem('timerMod.historyAlpha')) || 0.45;
+}
+
+function updateSessionTimeValues() {
+	// Compute split based on session timer: sessionNow - sessionTimerLastEntry
+	const sessionNow = getSessionTimerMs();
+	let elapsedMs = null;
+	if (sessionTimerLastEntry != null) {
+		elapsedMs = Math.floor(sessionNow - sessionTimerLastEntry);
+	} else {
+		// fallback to previous timing if sessionTimerLastEntry wasn't set
+		elapsedMs = parseInt((getTimerCached - levelTimer2).toFixed(0), 10);
+	}
+	if (sessionSplitTimes[currentLevel] == null) {
+		sessionSplitTimes[currentLevel] = elapsedMs;
+	}
+	// Track cumulative time at this level completion
+	if (sessionCumulTimes[currentLevel] == null) {
+		sessionCumulTimes[currentLevel] = sessionNow;
+	}
+	// Track entry time (wallclock when this level was completed) at this level
+	if (sessionEntryTimes[currentLevel] == null) {
+		sessionEntryTimes[currentLevel] = performance.now();
+	}
+	// update sessionTimerLastEntry so the next split measures from this point
+	sessionTimerLastEntry = sessionNow;
 }
 
 function draw() {
@@ -8982,6 +9169,8 @@ function draw() {
 		case 3:
 			ctx.drawImage(osc4, -Math.floor(-cameraX + shakeX) + Math.floor( (-cameraX+shakeX)/3), -Math.floor(-cameraY + shakeY) + Math.floor( Math.max( -cameraY/3 - ((bgXScale>bgYScale)?Math.max(0,(bgXScale*5.4-540)/2):0), 540 - osc4.height / pixelRatio) + shakeY/3), osc4.width / pixelRatio, osc4.height / pixelRatio);
 			drawLevel(ctx);
+
+			handleInputHistory();
 			
 			if (wipeTimer == 30 && menuScreen != 4 && charsAtEnd >= charCount2) levelBeat = true;
 
@@ -9004,32 +9193,12 @@ function draw() {
 					// timer += getTimerCached - levelTimer2; // Removed: timer is added below in the level end logic
 					best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimerCached - levelTimer2).toFixed(0));
 					prev[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
-					// Compute split based on session timer: sessionNow - sessionTimerLastEntry
-					const sessionNow = getSessionTimerMs();
-					let elapsedMs = null;
-					if (sessionTimerLastEntry != null) {
-						elapsedMs = Math.floor(sessionNow - sessionTimerLastEntry);
-					} else {
-						// fallback to previous timing if sessionTimerLastEntry wasn't set
-						elapsedMs = parseInt((getTimerCached - levelTimer2).toFixed(0), 10);
-					}
-					if (sessionSplitTimes[currentLevel] == null) {
-						sessionSplitTimes[currentLevel] = elapsedMs;
-					}
-					// Track cumulative time at this level completion
-					if (sessionCumulTimes[currentLevel] == null) {
-						sessionCumulTimes[currentLevel] = sessionNow;
-					}
-					// Track entry time (wallclock when this level was completed) at this level
-					if (sessionEntryTimes[currentLevel] == null) {
-						sessionEntryTimes[currentLevel] = performance.now();
-					}
+
 					// Livesplit timer stuff
 					if (sessionTimerRunning) {
+						updateSessionTimeValues();
 						updateSplitTime(currentLevel);
 						currSplit++;
-						// update sessionTimerLastEntry so the next split measures from this point
-						sessionTimerLastEntry = sessionNow;
 						// Stop session timer when level 52 is completed (last level in run - 1)
 						if (currentLevel === 51 && splitCategory.name !== '100%') {
 							stopSessionTimer();
@@ -11554,6 +11723,10 @@ function draw() {
 			cachedShowKeys = +!+(cachedShowKeys || 1) + '';
 			bfdia5b.setItem('timerMod.showKeys', cachedShowKeys);
 		}
+		if ((_keysDown[85] || (uPress = false)) && !uPress && (uPress = true)) {
+			cachedShowHistory = +!+(cachedShowHistory || 1) + '';
+			bfdia5b.setItem('timerMod.showHistory', cachedShowHistory);
+		}
 		redrawTimerTexts(
 			getTimerCached - levelTimer2, best[currentLevel] || getTimerCached - levelTimer2, timer + getTimerCached - levelTimer2,
 			levelTimerX, levelTimerY, levelTimerScale, levelTimerAlpha
@@ -11561,6 +11734,10 @@ function draw() {
 		redrawLevelKeys(
 			getKeyMapNames(), levelKeysX, levelKeysY, levelKeysScale, levelKeysAlpha
 		);
+		redrawInputHistory(
+			inputHistoryStr, cachedHistoryPos[0], cachedHistoryPos[1], cachedHistoryScale, cachedHistoryAlpha
+		);
+
 		drawLevelButtons();
 		if (menuScreen != 3) {
 			cameraX = 0;

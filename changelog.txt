@@ -7,6 +7,10 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 4) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
+03/07/26:
+-Added an input history display; this will show the last few inputs on each frame. The letters correspond to the equivalent inputs used in Coppersalts's TAS software (L=left, J=jump, Z=switch, etc. "u"=additional Up input and "r"=reset.) Useful for analyzing the exact duration of your inputs. Especially useful when analyzing recordings, and it can allow runs to be reconstructed easier, even on lower frame rates.
+-Fixed bug where last split of a Book/Match segment run doesn't autosplit.
+
 02/19/26:
 -Added gaining/losing colors to Livesplit delta!
 -Fixed HPRC recovery savestate bug (I forgot to load a variable) and dialogue savestate bug (I forgot to load 2 variables)
