@@ -1,11 +1,14 @@
 THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
-1) fix lever position not updating after 2 load states
-2) Make a vertical Livesplit layout
-3) Add losing/gaining time colors in Livesplit
+1) Make a vertical Livesplit layout
+2) make input sequence recorder 
+3) fix lever position not updating after 2 load states
 4) Fix stay-after-finish positions resetting before wipe
 ?) Got any more ideas? DM me on Discord!: @korzenten
+
+03/10/26:
+-Changed the "Clear Fastest Run Data" button to delete only the data for the currently-selected category rather than for every category.
 
 03/07/26:
 -Added an input history display; this will show the last few inputs on each frame. The letters correspond to the equivalent inputs used in Coppersalts's TAS software (L=left, J=jump, Z=switch, etc. "u"=additional Up input and "r"=reset.) Useful for analyzing the exact duration of your inputs. Especially useful when analyzing recordings, and it can allow runs to be reconstructed easier, even on lower frame rates.

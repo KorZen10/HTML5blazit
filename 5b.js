@@ -210,7 +210,24 @@ let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Fe
 
 // speedrun mod:
 let keyRemapsText = ['Jump','Switch player','Reset level','Move left','Move right', 'Grab/Throw object', 'Drop object', 'Advance dialogue', 'Additional "up" input'];
-let keyMappings = {jump: 32, switch: 90, reset: 82, left: 37, right: 39, grab: 38, drop: 40, talk: 13, grabExtra: 38};
+let keyMappings = {
+	jump: 32, 
+	switch: 90, 
+	reset: 82, 
+	left: 37, 
+	right: 39, 
+	grab: 38, 
+	drop: 40, 
+	talk: 13, 
+	grabExtra: 38,
+	// saveState: TODO,
+	// loadState: TODO,
+	// pause: TODO,
+	// unpause: TODO,
+	// toggleTimer: TODO,
+	// toggleInputs: TODO,
+	// toggleHistory: TODO,
+};
 
 // When the layout editor asks the player to remap a control, this holds the index
 // of the action currently awaiting a keypress, or null when not listening.
@@ -2505,25 +2522,19 @@ function resetSessionTimer() {
 }
 
 function clearFastestRun() {
-	// Remove all category-scoped fastest-run keys from storage
+	// Remove fastest-run data only for the currently selected category
 	const bases = ['fastestRunTime','fastestRunCumulTimes','fastestRunEntryTimes','bestIndividualSplits','furthest'];
-	for (const cat of categoryData) {
-		for (const b of bases) {
-			bfdia5b.removeItem(b + ':' + cat.name);
-		}
+	for (const b of bases) {
+		bfdia5b.removeItem(getSplitKey(b));
 	}
-	// Also remove any keys that might have been stored without category suffix (legacy)
-	for (const b of bases) bfdia5b.removeItem(b);
 
-	// Clear in-memory maps for all categories
+	// Clear in-memory data for the current category
 	fastestRunTime = null;
-	for (const cat of categoryData) {
-		fastestRunCumulTimes[cat.name] = new Array(levelCount).fill(null);
-		fastestRunEntryTimes[cat.name] = new Array(levelCount).fill(null);
-	}
+	fastestRunCumulTimes[splitCategory.name] = new Array(levelCount).fill(null);
+	fastestRunEntryTimes[splitCategory.name] = new Array(levelCount).fill(null);
 	bestIndividualSplits = new Array(levelCount).fill(null);
 
-	// Rebuild the UI to reflect cleared data
+	// Rebuild the UI to reflect cleared data for this category
 	createLivesplitEntries();
 }
 
@@ -9135,7 +9146,6 @@ function updateSessionTimeValues() {
 	// update sessionTimerLastEntry so the next split measures from this point
 	sessionTimerLastEntry = sessionNow;
 }
-
 function draw() {
 	onButton = false;
 	hoverText = '';
@@ -9196,14 +9206,18 @@ function draw() {
 
 					// Livesplit timer stuff
 					if (sessionTimerRunning) {
-						updateSessionTimeValues();
-						updateSplitTime(currentLevel);
-						currSplit++;
-						// Stop session timer when level 52 is completed (last level in run - 1)
-						if (currentLevel === 51 && splitCategory.name !== '100%') {
-							stopSessionTimer();
+						// only split if the current level is the one you're supposed to be on
+						if (currSplit == currentLevel - splitCategory.start) {
+							updateSessionTimeValues();
+							updateSplitTime(currentLevel);
+							currSplit++;
+							// Stop session timer when level 52 is completed (last level in run - 1)
+							if (currentLevel === 51 && splitCategory.name !== '100%') {
+								stopSessionTimer();
+							}
 						}
-						else if (splitCategory.name === '100%' && coins == 52) {
+						// check if we're running 100% and split if we got every coin
+						if (splitCategory.name === '100%' && coins == 52) {
 							// Autosplit the 100% 'missed' entry manually
 							const sessionNow = getSessionTimerMs();
 							const prevIndex = (splitCategory) ? splitCategory.end : (levelCount - 1);
