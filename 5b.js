@@ -100,6 +100,7 @@ function setFurthestProgress(n) {
 }
 var best;
 var prev;
+var comp;
 let bonusProgress;
 let bonusesCleared;
 let gotCoin;
@@ -203,10 +204,11 @@ let screenFlashes = true;
 let frameRateThrottling = false;
 let slowTintsEnabled = true;
 let speedrunPracticeMode = true; // this enables/disables all speedrun features except for the livesplit timer
-// Populate after DOM is ready so getElementById returns real elements.
+let inputHistoryTracking = true;
+
 let speedrunPracticeBtns = [];
 let fastRestart = false; // speedrun mod thing
-let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode'];
+let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode', 'Input History Tracking'];
 
 // speedrun mod:
 let keyRemapsText = ['Jump','Switch player','Reset level','Move left','Move right', 'Grab/Throw object', 'Drop object', 'Advance dialogue', 'Additional "up" input'];
@@ -313,6 +315,7 @@ function clearVars() {
 	deathCount = timer = coins = bonusProgress = levelProgress = 0;
 	best = new Array(levelCount);
 	prev = new Array(levelCount);
+	comp = new Array(levelCount);
 	bonusesCleared = new Array(33).fill(false);
 	gotCoin = new Array(levelCount).fill(false);
 }
@@ -328,6 +331,7 @@ function saveGame() {
 	}
 	bfdia5b.setItem('timerMod.best', best.join(','));
 	bfdia5b.setItem('timerMod.prev', prev.join(','));
+	bfdia5b.setItem('timerMod.comp', comp.join(','));
 	bfdia5b.setItem('gotCoin', gotCoin);
 	bfdia5b.setItem('coins', coins);
 	bfdia5b.setItem('levelProgress', levelProgress);
@@ -348,6 +352,7 @@ function getSavedGame() {
 		bonusProgress = 0;
 		best = bfdia5b.getItem('timerMod.best')?.split(',').map(n => parseInt(n)) || new Array(levelCount);
 		prev = bfdia5b.getItem('timerMod.prev')?.split(',').map(n => parseInt(n)) || new Array(levelCount);
+		comp = bfdia5b.getItem('timerMod.comp')?.split(',').map(n => parseInt(n)) || new Array(levelCount);
 		deathCount = parseInt(bfdia5b.getItem('deathCount'));
 		timer = parseFloat(bfdia5b.getItem('timer'));
 		gotCoin = new Array(levelCount);
@@ -413,7 +418,7 @@ function loadFastestRun() {
 }
 
 function saveSettings() {
-	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled, speedrunPracticeMode]));
+	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled, speedrunPracticeMode, inputHistoryTracking]));
 	toggleSpeedrunPracticeMode();
 }
 
@@ -429,6 +434,7 @@ function getSavedSettings() {
 		frameRateThrottling = settingsArray[4];
 		slowTintsEnabled = settingsArray[5];
 		speedrunPracticeMode = settingsArray[6];
+		inputHistoryTracking = settingsArray[7];
 	}
 	// Load persisted key mappings (supports new JSON object/array format and legacy comma list)
 	const savedKeyMappingsRaw = bfdia5b.getItem('timerMod.keyMappings');
@@ -2212,6 +2218,11 @@ let diaDropdownType;
 let lcPopUp = false;
 let lcPopUpNextFrame = false;
 let lcPopUpType = 0;
+let levelTileHistoryModuleOpen = false;
+let levelTileHistoryModuleLevel = -1;
+
+
+let levelTileHistoryModuleNewFormat = false;
 let tabHeight = 30;
 let tileTabScrollBar = 0;
 let charsTabScrollBar = 0;
@@ -2692,6 +2703,8 @@ let svgMenu2borderimg;
 let preMenuBG;
 let svgMenuBg;
 let svgMenuOverlay;
+let svgEyeBlack;
+let svgEyeBlue;
 let svgTools = new Array(12);
 let svgMyLevelsIcons = new Array(5);
 let menu2_3Buttons = [
@@ -2881,6 +2894,8 @@ async function loadingScreen() {
 	svgMenu0 = await createImage(resourceData['menu0.svg']);
 	svgMenuBg = await createImage('visuals/5blazit_menu_bg.png');
 	svgMenuOverlay = await createImage('visuals/5blazit_menu_overlay.png');
+	svgEyeBlack = await createImage(resourceData['eyeblack.svg'] || 'visuals/eyeblack.svg');
+	svgEyeBlue = await createImage(resourceData['eyeblue.svg'] ||  'visuals/eyeblue.svg');
 	svgMenu2 = await createImage(resourceData['menu2.svg']);
 	svgMenu6 = await createImage(resourceData['menu6.svg']);
 	svgMenu2border = await createImage(resourceData['menu2border.svg']);
@@ -2955,6 +2970,7 @@ function getSavedSettings() {
 		frameRateThrottling = settingsArray[4];
 		slowTintsEnabled = settingsArray[5];
 		speedrunPracticeMode = settingsArray[6];
+		inputHistoryTracking = settingsArray[7];
 	}
 
 	// Load persisted key mappings (supports JSON arrays/objects and the legacy comma list)
@@ -3384,8 +3400,8 @@ function exitExploreLevel() {
 	cameraY = 0;
 }
 
-function drawMenu0Button(text, x, y, grayed, action, width = menu0ButtonSize.w, height = menu0ButtonSize.h) {
-	let fill = '#ffffff';
+function drawMenu0Button(text, x, y, grayed, action, width = menu0ButtonSize.w, height = menu0ButtonSize.h, baseFill = '#ffffff') {
+	let fill = baseFill;
 	if (!grayed) {
 		if (!lcPopUp && onRect(_xmouse, _ymouse, x, y, width, height)) {
 			onButton = true;
@@ -3440,18 +3456,48 @@ function drawLevelButton(text, x, y, id, color) {
 	if (menuScreen == 3) return;
 	let fill = '#585858';
 	let newText;
-	let mouseHover = onRect(_xmouse, _ymouse + cameraY, x, y, levelButtonSize.w, levelButtonSize.h) && (_xmouse < 587 || _ymouse < 469);
+	const _showPrevTime = bfdia5b.getItem('timerMod.showPrevTime');
+	const showEyeForLevel = hasLevelBestInputHistory(id) && !(_showPrevTime == 2 && !comp[id]);
+	let mouseHover =
+		!levelTileHistoryModuleOpen &&
+		onRect(_xmouse, _ymouse + cameraY, x, y, levelButtonSize.w, levelButtonSize.h) &&
+		(_xmouse < 587 || _ymouse < 469);
+	const eyePad = 1;
+	const eyeSize = 14;
+	const eyeX = x + levelButtonSize.w - eyePad - eyeSize - 1;
+	const eyeY = y + eyePad - 1;
+	let eyeHover = false;
+	if (mouseHover && showEyeForLevel && (svgEyeBlack || svgEyeBlue)) {
+		eyeHover =
+			onRect(_xmouse, _ymouse + cameraY, eyeX, eyeY, eyeSize, eyeSize) &&
+			(_xmouse < 587 || _ymouse < 469);
+		if (eyeHover) {
+			onButton = true;
+			if (mousePressedLastFrame) {
+				openLevelTileHistoryModule(id);
+			}
+			mouseHover = false;
+		}
+	}
 	if (color == 2) fill = '#ff8000';
 	else if (color == 3) fill = '#efe303';
 	else if (color == 4) fill = '#00cc00';
 	if (color > 1) {
+		// Auto-show all times mode: display time on every level tile without hovering
+		const _autoShowTimes = bfdia5b.getItem('timerMod.autoShowTimes') == '1';
+		if (_autoShowTimes && !mouseHover) {
+			if (_showPrevTime == 1 && prev[id]) newText = toMMSSms(prev[id]);
+			else if (_showPrevTime == 0 && best[id]) newText = toMMSSms(best[id]);
+			else if (_showPrevTime == 2 && comp[id]) newText = toMMSSms(comp[id]);
+		}
 		if (mouseHover) {
 			onButton = true;
+			const showPrevTime = _showPrevTime;
 			if (mouseIsDown || rightMouseDown || rightClickReleased) {
 				if (color == 2) fill = '#d56a00';
 				else if (color == 3) fill = '#c6bc02';
 				else if (color == 4) fill = '#00a200';
-				if (bfdia5b.getItem('timerMod.showPrevTime') != 'true' && best[id]) clearTime -= 100;
+				if (showPrevTime == 0 && best[id] || showPrevTime == 2 && comp[id]) clearTime -= 100;
 
 				if (mouseIsDown) levelButtonClicked = id;
 				else if (rightMouseDown || rightClickReleased) resetBestTimeID = id;
@@ -3461,13 +3507,23 @@ function drawLevelButton(text, x, y, id, color) {
 				else if (color == 3) fill = '#ffff99';
 				else if (color == 4) fill = '#22ff22';
 			}
-			if (bfdia5b.getItem('timerMod.showPrevTime') == 'true' && prev[id]) newText = toHMS(prev[id]);
-			else if (best[id]) newText = toHMS(best[id]);
+			if (showPrevTime == 1 && prev[id]) newText = toMMSSms(prev[id]);
+			else if (showPrevTime == 0 && best[id]) newText = toMMSSms(best[id]);
+			else if (showPrevTime == 2 && comp[id]) newText = toMMSSms(comp[id]);
+
 		}
 		if (resetBestTimeID === id && !rightMouseDown) {
-			// reset the best time
-			best[id] = undefined;
-			saveGame();
+			const conf = confirm(`This will delete your best times for level ${id + 1}. Are you sure?`);
+			if (conf) {
+				// reset the best time
+				best[id] = undefined;
+				comp[id] = undefined;
+				if (gotCoin[id]) coins--;
+				gotCoin[id] = false;
+				inputHistoryLongBests[id] = [];
+				deleteStoredInputHistoryLong('timerMod.inputHistoryLongBests', id);
+				saveGame();
+			}
 			resetBestTimeID = -1;
 			rightClickReleased = false;
 		}
@@ -3481,7 +3537,7 @@ function drawLevelButton(text, x, y, id, color) {
 				clearTime = 10000;
 			}
 			if (clearTime <= 0) {
-				newText = best[id] = undefined;
+				newText = best[id] = comp[id] = undefined;
 				saveGame();
 			}
 			ctx.globalAlpha = clearTime > 0 ? clearTime / 10000 : 1;
@@ -3510,7 +3566,85 @@ function drawLevelButton(text, x, y, id, color) {
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
 	ctx.fillText(!newText ? text : newText, x + levelButtonSize.w / 2, y + (levelButtonSize.h * 1.1) / 2);
+	if (showEyeForLevel && (svgEyeBlack || svgEyeBlue) && !levelTileHistoryModuleOpen && onRect(_xmouse, _ymouse + cameraY, x, y, levelButtonSize.w, levelButtonSize.h) && (_xmouse < 587 || _ymouse < 469)) {
+		const eyeImg = eyeHover ? (svgEyeBlue || svgEyeBlack) : (svgEyeBlack || svgEyeBlue);
+		ctx.drawImage(eyeImg, eyeX, eyeY, eyeSize, eyeSize);
+	}
 	ctx.globalAlpha = 1;
+}
+
+function hasLevelBestInputHistory(levelID) {
+	let bestInputs = inputHistoryLongBests[levelID];
+	return Array.isArray(bestInputs) && bestInputs.length > 0;
+}
+function hasLevelCompInputHistory(levelID) {
+	let compInputs = inputHistoryLongComps[levelID];
+	return Array.isArray(compInputs) && compInputs.length > 0;
+}
+
+function openLevelTileHistoryModule(levelID) {
+	if (levelTileHistoryModuleOpen) return;
+	levelTileHistoryModuleLevel = levelID;
+	const showPrevTime = bfdia5b.getItem('timerMod.showPrevTime');
+	let selectedHistory =
+		(showPrevTime == 1) ? inputHistoryLongPrevs[levelID]
+		: (showPrevTime == 0) ? inputHistoryLongBests[levelID]
+		: inputHistoryLongComps[levelID];
+	let tasText = Array.isArray(selectedHistory) ? parseListToTAS(selectedHistory) : '';
+	let titleLabel = 'Level ' + (levelID + 1).toString() +
+		((showPrevTime == 1) ? ' Previous' : (showPrevTime == 0) ? ' Best' : ' Best with Win Token') + ' inputs:';
+
+	let overlay = document.getElementById('history-module-overlay');
+	let titleEl = document.getElementById('history-module-title');
+	let textarea = document.getElementById('history-module-textarea');
+	let convertBtn = document.getElementById('history-module-convert');
+	if (overlay && titleEl && textarea) {
+		titleEl.textContent = titleLabel;
+		textarea.value = tasText;
+		levelTileHistoryModuleNewFormat = false;
+		if (convertBtn) convertBtn.textContent = 'Convert to new format';
+		overlay.classList.add('open');
+	}
+	levelTileHistoryModuleOpen = true;
+	togglePausePlay();
+}
+
+function closeLevelTileHistoryModule() {
+	if (!levelTileHistoryModuleOpen) return;
+	let overlay = document.getElementById('history-module-overlay');
+	if (overlay) overlay.classList.remove('open');
+	levelTileHistoryModuleNewFormat = false;
+	levelTileHistoryModuleOpen = false;
+	togglePausePlay();
+}
+
+function parseNewFormat() {
+	if (levelTileHistoryModuleLevel < 0) return;
+	const showPrevTime = bfdia5b.getItem('timerMod.showPrevTime');
+	let requestedHistory =
+		(showPrevTime == 1) ? inputHistoryLongPrevs[levelTileHistoryModuleLevel]
+		: (showPrevTime == 0) ? inputHistoryLongBests[levelTileHistoryModuleLevel]
+		: inputHistoryLongComps[levelTileHistoryModuleLevel];
+
+	let textarea = document.getElementById('history-module-textarea');
+	let convertBtn = document.getElementById('history-module-convert');
+	if (!textarea) return;
+
+	if (!Array.isArray(requestedHistory)) {
+		textarea.value = '';
+		if (convertBtn) convertBtn.textContent = 'Convert to new format';
+		levelTileHistoryModuleNewFormat = false;
+		return;
+	}
+
+	levelTileHistoryModuleNewFormat = !levelTileHistoryModuleNewFormat;
+	if (levelTileHistoryModuleNewFormat) {
+		textarea.value = parseListToNewTAS(requestedHistory);
+		if (convertBtn) convertBtn.textContent = 'Revert to old format';
+	} else {
+		textarea.value = parseListToTAS(requestedHistory);
+		if (convertBtn) convertBtn.textContent = 'Convert to new format';
+	}
 }
 
 function drawNewGame2Button(text, x, y, color, action) {
@@ -3682,9 +3816,21 @@ function drawLevelMap() {
 		ctx.fillText((deathCount - mdao[levelProgress - 1]).toLocaleString(), 767.3, 116.8);
 	}
 	drawMenu0Button('CHANGE LAYOUT', 357.20, 105.00, false, () => (menuScreen = 12), 164.15, 23.20);
-	drawMenu0Button(`SHOWING: ${bfdia5b.getItem('timerMod.showPrevTime') == 'true' ? 'PREV' : 'BEST'}`, 357.20, 129.35, false,
-		() => bfdia5b.setItem('timerMod.showPrevTime', bfdia5b.getItem('timerMod.showPrevTime') != 'true'),
-		164.15, 23.20
+	// NOTE: "showPrevTime" used to just be a toggle between prev and best, but now it's a cycle with comp included, so the variable name doesn't really make sense.
+	let showPrevTime = bfdia5b.getItem('timerMod.showPrevTime');
+	let autoShowTimes = bfdia5b.getItem('timerMod.autoShowTimes') == '1';
+	// Right-click the SHOWING button to toggle displaying all times
+	if (!lcPopUp && onRect(_xmouse, _ymouse, 357.20, 129.35, 164.15, 23.20) && rightClickReleased) {
+		bfdia5b.setItem('timerMod.autoShowTimes', autoShowTimes ? '0' : '1');
+		autoShowTimes = !autoShowTimes;
+		rightClickReleased = false;
+	}
+	drawMenu0Button(`SHOWING: ${showPrevTime == 1 ? 'PREV' : showPrevTime == 2 ? 'COMP' : 'BEST'}`, 357.20, 129.35, false,
+		() => {
+			if (showPrevTime != 0 && showPrevTime != 1 && showPrevTime != 2) showPrevTime = 0;
+			bfdia5b.setItem('timerMod.showPrevTime', (showPrevTime + 1) % 3)
+		},
+		164.15, 23.20, autoShowTimes ? '#ffee44' : '#ffffff'
 	);
 	drawMenu0Button('19', 100, 129.35, false, () => { resetSessionTimer(); levelProgress = 18; }, 
 		40, 23.20
@@ -3925,12 +4071,17 @@ function redrawInputHistory(historyStr, x, y, scale = 0.6, alpha = 0.45) {
 	ctx.font = prevFont;
 }
 
+let inputHistoryLongBests = {}; // "levelid: list"
+let inputHistoryLongPrevs = {}; // "levelid: list"
+let inputHistoryLongComps = {}; // "levelid: list"
+let thisInputHistoryLong = [];
 let inputHistory = [null, null, null, null, null, null, null, null, null, null]; // FIFO queue, older->newer
 let inputHistoryFullness = 0; // 0 is empty, 10 (maximum) means input occurred on the most recent frame
 let inputHistoryIsActive = false;
 let inputHistoryStr = ""; // 19-char display string for UI (older->newer, rightmost is newest)
-function handleInputHistory() {
-	// Build current input string (RLUDJZE)
+
+// Build current input string (RLUDJZE)
+function buildCurrentInput(inLevel) { // inLevel distinguishes between which version of extra grab to use (one's better for real-time display, other works with TAS)
 	let str = "";
 	if (_keysDown[keyMappings.jump]) str += "J";
 	if (_keysDown[keyMappings.switch]) str += "Z";
@@ -3938,9 +4089,15 @@ function handleInputHistory() {
 	if (_keysDown[keyMappings.left]) str += "L";
 	if (_keysDown[keyMappings.right]) str += "R";
 	if (_keysDown[keyMappings.grab]) str += "U";
-	if (_keysDown[keyMappings.grabExtra] && keyMappings.grabExtra !== keyMappings.grab) str += "u";
+	if (_keysDown[keyMappings.grabExtra] && keyMappings.grabExtra !== keyMappings.grab) str += (inLevel) ? "u" : "U*";
 	if (_keysDown[keyMappings.drop]) str += "D";
 	if (_keysDown[keyMappings.talk]) str += "E";
+	return str;
+}
+
+// THE SHORT STRING used in the display within level
+function handleInputHistory() {
+	let str = buildCurrentInput();
 
 	// If no input and we're not currently active, do nothing
 	if (str.length === 0 && !inputHistoryIsActive) {
@@ -3970,6 +4127,129 @@ function handleInputHistory() {
 	const joined = inputHistory.map(e => e === null ? '-' : e).join(' ');
 	// Keep the most recent 19 characters, pad left to always be 19 chars
 	inputHistoryStr = joined.slice(-19).padStart(19, ' ');
+}
+
+// THE LONG STRING visible in level select screen
+function initInputHistoryLongs() {
+	inputHistoryLongBests = loadStoredInputHistoryLongs('timerMod.inputHistoryLongBests');
+	inputHistoryLongPrevs = loadStoredInputHistoryLongs('timerMod.inputHistoryLongPrevs');
+	inputHistoryLongComps = loadStoredInputHistoryLongs('timerMod.inputHistoryLongComps');
+	console.log("inputHistoryLongBests:",inputHistoryLongBests);
+}
+function updateInputHistoryLong() {
+	let str = buildCurrentInput();
+	// if (str.length > 0) thisInputHistoryLong.push(str);
+	// else thisInputHistoryLong.push("-");
+	
+	// THIS IS A DIRTY FIX TO FIRST INPUT OF RECORDING NOT SAVING FOR SOME REASON
+	let toAdd = (str.length > 0) ? str : "-";
+	if (thisInputHistoryLong.length > 0) thisInputHistoryLong.push(toAdd);
+	else {
+		thisInputHistoryLong.push(toAdd);
+		thisInputHistoryLong.push(toAdd);
+	}
+}
+function saveInputHistoryLong(levelid, isBest, isBestComp) { // prev is always updated; if isBest, update best, and if isBestComp, update comp
+	let list = []
+	if (!inputHistoryTracking) list = ["Input history tracking disabled during this run."]
+	else {
+		if (thisInputHistoryLong.length > 7200) list = ["STRING TOO LONG; please keep time under 2 minutes"]
+		else list = thisInputHistoryLong;
+	}
+
+	const tasString = parseListToTAS(list);
+	if (isBest) {
+		inputHistoryLongBests[levelid] = list;
+		saveStoredInputHistoryLong('timerMod.inputHistoryLongBests', levelid, list);
+	}
+	if (isBestComp) {
+		inputHistoryLongComps[levelid] = list;
+		saveStoredInputHistoryLong('timerMod.inputHistoryLongComps', levelid, list);
+	}
+	inputHistoryLongPrevs[levelid] = list;
+	saveStoredInputHistoryLong('timerMod.inputHistoryLongPrevs', levelid, list);
+}
+function resetInputHistoryLong() {
+	thisInputHistoryLong = [];
+}
+function deleteInputHistoryLong(levelid) {
+	inputHistoryLongBests[levelid] = [];
+	inputHistoryLongPrevs[levelid] = [];
+	inputHistoryLongComps[levelid] = [];
+	deleteStoredInputHistoryLong('timerMod.inputHistoryLongBests', levelid);
+	deleteStoredInputHistoryLong('timerMod.inputHistoryLongPrevs', levelid);
+	deleteStoredInputHistoryLong('timerMod.inputHistoryLongComps', levelid);
+}
+function parseListToTAS(list) {
+	let str = "";
+	for (let a of list) {
+		str += a + " ";
+	}
+	return str;
+}
+function parseListToNewTAS(list) {
+	let str = "";
+	let prev = null;
+	let count = 0;
+	for (let a of list) {
+		if (prev == null) {
+			prev = a;
+			count = 1;
+		}
+		else if (prev == a) {
+			count++;
+		}
+		else { // prev != a
+			if (count == 1) str += prev + " ";
+			else {
+				str += count + ":" + prev + " ";
+			}
+			prev = a;
+			count = 1;
+		}
+	}
+	if (prev != null) {
+		if (count == 1) str += prev + " ";
+		else str += count + ":" + prev + " ";
+	}
+	return str;
+}
+
+function loadStoredInputHistoryLongs(storageKey) {
+	const raw = bfdia5b.getItem(storageKey);
+	if (!raw) return {};
+	try {
+		const parsed = JSON.parse(raw);
+		return parsed && typeof parsed === 'object' ? parsed : {};
+	} catch (e) {
+		return {};
+	}
+}
+
+function saveStoredInputHistoryLong(storageKey, levelid, tasString) {
+	let stored = {};
+	const raw = bfdia5b.getItem(storageKey);
+	if (raw) {
+		try {
+			stored = JSON.parse(raw) || {};
+		} catch (e) {
+			stored = {};
+		}
+	}
+	stored[levelid] = tasString;
+	bfdia5b.setItem(storageKey, JSON.stringify(stored));
+}
+
+function deleteStoredInputHistoryLong(storageKey, levelid) {
+	const raw = bfdia5b.getItem(storageKey);
+	if (!raw) return;
+	try {
+		const stored = JSON.parse(raw) || {};
+		delete stored[levelid];
+		bfdia5b.setItem(storageKey, JSON.stringify(stored));
+	} catch (e) {
+		bfdia5b.setItem(storageKey, '{}');
+	}
 }
 
 var levelTimerOffset, levelKeysOffset, levelHistoryOffset;
@@ -4569,6 +4849,8 @@ function resetLevel() {
 		if (splitCategory.name === "matchsegment" && currentLevel == 18) resetSessionTimer();
 		else if (splitCategory.name === "icecubesegment" && currentLevel == 41) resetSessionTimer();
 	}
+
+	resetInputHistoryLong();
 }
 
 function copyLevel(thatLevel) {
@@ -8858,6 +9140,9 @@ function keydown(event) {
 		if (event.key === 'w') saveState();
 		if (event.key === 'e') loadState();
 	}
+
+	// input history module in level select can be closed with escape
+	if (event.key == "Escape") closeLevelTileHistoryModule();
 }
 
 function keyup(event) {
@@ -8983,6 +9268,7 @@ function createLivesplitEntries() {
 }
 
 function setup() {
+	initInputHistoryLongs();
 	osc1 = document.createElement('canvas');
 	osc1.width = cwidth;
 	osc1.height = cheight;
@@ -9167,7 +9453,7 @@ function draw() {
 
 		case 2:
 			drawLevelMap();
-			if (_xmouse < 587 || _ymouse < 469) {
+			if (!levelTileHistoryModuleOpen && (_xmouse < 587 || _ymouse < 469)) {
 				if (_ymouse <= 180) {
 					cameraY = Math.min(Math.max(cameraY - (180 - _ymouse) * 0.1, 0), 1080);
 				} else if (_ymouse >= 360) {
@@ -9181,6 +9467,7 @@ function draw() {
 			drawLevel(ctx);
 
 			handleInputHistory();
+			if (inputHistoryTracking) updateInputHistoryLong();
 			
 			if (wipeTimer == 30 && menuScreen != 4 && charsAtEnd >= charCount2) levelBeat = true;
 
@@ -9195,14 +9482,30 @@ function draw() {
 
 				if (charsAtEnd >= charCount2) {
 					// beat the level!
+					let isBest = false;
+					let isBestComp = false;
 					if (playMode != 2 && gotThisCoin && !gotCoin[currentLevel]) {
 						gotCoin[currentLevel] = true;
 						coins++;
 						// bonusProgress = Math.floor(coins * 0.33);
 					}
 					// timer += getTimerCached - levelTimer2; // Removed: timer is added below in the level end logic
-					best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimerCached - levelTimer2).toFixed(0));
+
+					
+					if ((getTimerCached - levelTimer2).toFixed(0) < (best[currentLevel] || Infinity)) {
+						best[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
+						isBest = true;
+					}
+					// TODO condition doesn't quite work bc gotCoin doesn't reset after level ends
+					console.log("(getTimerCached - levelTimer2).toFixed(0):",(getTimerCached - levelTimer2).toFixed(0));
+					console.log("(comp[currentLevel] || Infinity):",(comp[currentLevel] || Infinity));
+					console.log("gotThisCoin:",gotThisCoin);
+					if ((getTimerCached - levelTimer2).toFixed(0) < (comp[currentLevel] || Infinity) && gotThisCoin) {
+						comp[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
+						isBestComp = true;
+					}
 					prev[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
+					saveInputHistoryLong(currentLevel, isBest, isBestComp); // save the input history string for this lvl
 
 					// Livesplit timer stuff
 					if (sessionTimerRunning) {
@@ -9234,8 +9537,6 @@ function draw() {
 
 					if (!freezeLevelTimer) {
 						timer += getTimerCached - levelTimer2;
-						best[currentLevel] = Math.min(best[currentLevel] || Infinity, (getTimerCached - levelTimer2).toFixed(0));
-						prev[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
 					}
 
 					if (playMode == 0 && !stayInLevel) {
@@ -11446,6 +11747,10 @@ function draw() {
 						break;
 					case 6:
 						thisOptionValue = speedrunPracticeMode;
+						break;
+					case 7:
+						thisOptionValue = inputHistoryTracking;
+						break;
 				}
 				ctx.fillStyle = thisOptionValue?'#00ff00':'#ff0000';
 				ctx.fillText(thisOptionValue?'on':'off', 615, y+2);
@@ -11474,6 +11779,9 @@ function draw() {
 								break;
 							case 6:
 								speedrunPracticeMode = !speedrunPracticeMode;
+								break;
+							case 7:
+								inputHistoryTracking = !inputHistoryTracking;
 								break;
 						}
 					}
@@ -12448,7 +12756,7 @@ class TextBox {
 			if (mousePressedLastFrame && onRect(lastClickX, lastClickY, this.x, this.y, this.w, this.h)) {
 				this.setCursorPosition(this.coordinatesToTextPosition(_xmouse, _ymouse, true));
 				// If we weren't already editing the text box, start editing it.
-				if (!this.beingEdited) {
+				if (!this.beingEdited && !this.readonly) {
 					deselectAllTextBoxes();
 					this.beingEdited = true;
 					editingTextBox = true;

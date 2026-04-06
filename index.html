@@ -96,5 +96,16 @@
 		<!--document.getElementById('TEMP').textContent = -->
 		<!-- <div id="TEMP">hi</h1> -->
 	</div>
+	<!-- History Module HTML Overlay -->
+	<div id="history-module-overlay" onclick="if(event.target===this)closeLevelTileHistoryModule()">
+		<div id="history-module-popup">
+			<p id="history-module-title">Level inputs:</p>
+			<textarea id="history-module-textarea" readonly spellcheck="false"></textarea>
+			<div id="history-module-footer">
+				<button id="history-module-convert" onclick="parseNewFormat()">Convert to new format</button>
+				<button id="history-module-close" onclick="closeLevelTileHistoryModule()">Close</button>
+			</div>
+		</div>
+	</div>
 </body>
 </html>
