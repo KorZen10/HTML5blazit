@@ -1,15 +1,14 @@
 THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
-1) Make a vertical Livesplit Layout
-3) Fix lever position not updating after 2 load states
-Add ability to translate the input sequence display per level between regular and new TAS format
-Add complete% functionality
-Add ability to add custom categories (and remove them too)
+1) Fix lever position not updating after 2 load states
+2) Make a vertical Livesplit Layout
+3) Fix input sequences sometimes being recorded slightly inaccurately
+4) Add ability to add custom categories (and remove them too)
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
 04/05/26:
--Added an input history tracker for each level; this will track the input sequence of your best and most-recent playthroughs of each state, which you can view and copy by clicking the eyeball icon next to the desired level. You can then replay this string on Coppersalts's TAS software. If you're concerned about this feature lagging your game (though I ran tests and it generally performs well), you can disable this feature in the Options menu.
+-Added an input history tracker for each level; this will track the input sequence of your best and most-recent playthroughs of each state, which you can view and copy by clicking the eyeball icon next to the desired level. You can then replay this string on Coppersalts's TAS software. If you're concerned about this feature lagging your game (though I ran tests and it generally performs well), you can disable this feature in the Options menu. [NOTE: I've noticed that the strings are sometimes (though quite rarely) recorded slightly inaccurately. So while they are mostly accurate, you may have to tweak a frame here and there.]
 -Added ability to convert the input sequence to Coppersalts's new format and back. (It doesn't automatically add things like brackets though, not like that would be useful in RTA anyway.)
 -Added ability to view your best complete% times (and its associated input sequence) by adding in an additional option to the "SHOWING" button in the level select screen.
 -Added ability to right-click the "SHOWING" button in order to show the best, previous, and applicable best win token times for all levels at once.
