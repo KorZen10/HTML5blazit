@@ -1,7 +1,18 @@
 THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
+   Try idea to fix lag
 1) Fix lever position not updating after 2 load states
+   Fix HPRC load state issues
+   Fix win token load state issues
+   Hide/disable splits option ✅
+   Copy best times button ✅
+   Fix input display when showing symbols ✅
+   Make remappable inputs for secondary numpad keys
+   Make practice mode hotkeys remappable
+   Add death counter to layout
+   Fix desync between final time and last split cumul time
+   Add confirm if closing window while splits haven't been reset yet
 2) Make a vertical Livesplit Layout
 3) Fix input sequences sometimes being recorded slightly inaccurately
 4) Add ability to add custom categories (and remove them too)

@@ -211,7 +211,7 @@ let fastRestart = false; // speedrun mod thing
 let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode', 'Input History Tracking'];
 
 // speedrun mod:
-let keyRemapsText = ['Jump','Switch player','Reset level','Move left','Move right', 'Grab/Throw object', 'Drop object', 'Advance dialogue', 'Additional "up" input'];
+let keyRemapsText = ['Jump','Switch player','Reset level','Move left','Move right', 'Grab/Throw object', 'Drop object', 'Advance dialogue', 'Additional "up" input', 'Additional left input', 'Additional drop input', 'Additional right input'];
 let keyMappings = {
 	jump: 32, 
 	switch: 90, 
@@ -221,7 +221,10 @@ let keyMappings = {
 	grab: 38, 
 	drop: 40, 
 	talk: 13, 
+	leftExtra: 37,
+	rightExtra: 39,
 	grabExtra: 38,
+	dropExtra: 40,
 	// saveState: TODO,
 	// loadState: TODO,
 	// pause: TODO,
@@ -242,7 +245,10 @@ function keyCodeToSymbol(code) {
 	const symbols = {
 		32: '⎵', 13: '⏎', 27: 'Esc', 9: 'Tab', 16: '⇧', 17: 'Ctrl', 18: 'Alt',
 		37: '←', 38: '↑', 39: '→', 40: '↓',
-		8: '⌫', 46: 'Del'
+		8: '⌫', 46: 'Del',
+        188: ',', 190: '.', 191: '/', 186: ';', 
+        187: '=', 189: '-', 192: '`', 219: '[', 
+        220: '\\', 221: ']', 222: "'"
 	};
 	if (symbols[code]) return symbols[code];
 	// Letters & numbers: convert to lowercase character
@@ -258,7 +264,10 @@ function keyCodeToLabel(code) {
 	const names = {
 		32: 'Space', 13: 'Enter', 27: 'Esc', 9: 'Tab', 16: 'Shift', 17: 'Ctrl', 18: 'Alt',
 		37: '←', 38: '↑', 39: '→', 40: '↓',
-		8: 'Backspace', 46: 'Del'
+		8: 'Backspace', 46: 'Del',
+        188: ',', 190: '.', 191: '/', 186: ';', 
+        187: '=', 189: '-', 192: '`', 219: '[', 
+        220: '\\', 221: ']', 222: "'"
 	};
 	if (names[code]) return names[code];
 	// Letters & numbers (fallback): use fromCharCode if in printable range
@@ -269,7 +278,7 @@ function keyCodeToLabel(code) {
 }
 
 // Generate keyMapNames array dynamically from current keyMappings
-// Order: [jump, switch, reset, [empty], grab, left, drop, right, talk, grabExtra]
+// Order: [jump, switch, reset, [empty], grab, left, drop, right, talk, extras]
 // (The cached keymap name is just to help with efficiency)
 let cachedKeyMapNames = null;
 function getKeyMapNames() {
@@ -285,7 +294,10 @@ function getKeyMapNames() {
 		keyCodeToSymbol(keyMappings.drop),
 		keyCodeToSymbol(keyMappings.right),
 		keyCodeToSymbol(keyMappings.talk),
+		keyCodeToSymbol(keyMappings.leftExtra),
+		keyCodeToSymbol(keyMappings.rightExtra),
 		keyCodeToSymbol(keyMappings.grabExtra),
+		keyCodeToSymbol(keyMappings.dropExtra),
 	];
 	cachedKeyMapNames = result;
 	return result;
@@ -2444,10 +2456,11 @@ function getSessionTimerMs() {
 }
 
 function startSessionTimer() {
-	if (!sessionTimerRunning) {
-		sessionTimerStartWallTime = performance.now();
-		sessionTimerRunning = true;
-	}
+	if (sessionTimerRunning) return;
+	if (!splitsEnabled) return;
+
+	sessionTimerStartWallTime = performance.now();
+	sessionTimerRunning = true;
 }
 
 let runFinished = false;
@@ -2549,6 +2562,23 @@ function clearFastestRun() {
 	createLivesplitEntries();
 }
 
+let splitsEnabled = true;
+function deleteSplitVisual() {
+	if (!splitsEnabled) return;
+	splitsEnabled = false;
+	stopSessionTimer();
+	document.getElementById("livesplit-container").remove();
+	document.getElementById("toggleSplits").textContent = "[Reload page to restore splits]"
+}
+
+function copyPbSplits() {
+	let splits = fastestRunEntryTimes[splitCategory.name];
+	for (let i = 0; i < splits.length; i++) {
+		splits[i] /= 1000;
+	}
+	navigator.clipboard.writeText(splits);
+}
+
 let prevSplitSessionTime = null;
 let prevDelta = null;
 function updateSplitTime(levelId) {
@@ -2647,6 +2677,7 @@ function updateAllLivesplitEntries() {
 	// Include special 100% 'missed' split
 	if (splitCategory && splitCategory.name === '100%') indices.push('missed');
 
+	if (!splitsEnabled) return;
 	for (const i of indices) updateSplitTime(i);
 }
 
@@ -3216,21 +3247,6 @@ function playExploreLevel(continueGame=false) {
 function continueExploreLevelpack() {
 	playExploreLevel(true);
 }
-
-// function decodeCoinBin(coinBin) {
-// 	gotCoin = new Array(levelCount);
-// 	for (let i = 0; i < levelCount; i++) {
-// 		gotCoin[i] = (coinBin >> i) & 1 == 1;
-// 	}
-// }
-
-// function encodeCoinBin() {
-// 	let coinBin = 0;
-// 	for (let i = 0; i < gotCoin.length; i++) {
-// 		if (gotCoin[i]) coinBin += 1 << i;
-// 	}
-// 	return coinBin;
-// }
 
 function playSavedLevelpack() {
 	// It probably would've been better to modify the levelpack loader than to accommodate it like this.
@@ -3973,8 +3989,11 @@ function getKeyCoordinateMatrix() {
 		jump: [ [ -16.00, 74.00, 181.55, 53.00 ] ],
 		grabExtra: [ [ 305.00, 18.75, 48.00, 47.00 ] ], // grabExtra is right before grab so grab overwrites it if they're the same key
 		grab: [ [ 240.00, 13.85, 58.10, 57.25 ] ],
+		leftExtra: [ [ 180.00, 131.65, 58.10, 29 ] ],
 		left: [ [ 180.00, 72.75, 58.10, 57.25 ] ],
+		dropExtra: [ [ 240.00, 131.65, 58.10, 29 ] ],
 		drop: [ [ 240.00, 72.75, 58.10, 57.25 ] ],
+		rightExtra: [ [ 300.00, 131.65, 58.10, 29 ] ],
 		right: [ [ 300.00, 72.75, 58.10, 57.25 ] ],
 		talk: [ [ 364.65, 17.00, 13.90, 38.00 ], [ 377.65, 17.00, 49.40, 92.10 ] ],
 	};
@@ -4025,18 +4044,20 @@ function redrawLevelKeys(keys = [], x = 695, y = 3, scale = 0.6, alpha = 0.45) {
 	// grabExtra - smaller font size
 	const prevFont = ctx.font;
 	ctx.font = `${24 * scale}px Helvetica`;
-	ctx.fillText((keys[4] && keys[9] && keys[4] === keys[9]) ? '' : (keys[9] || ''), x + 305.00 * scale + 48.00/2 * scale, y + 27.75 * scale);
+	ctx.fillText((keys[4] && keys[11] && keys[4] === keys[11]) ? '' : (keys[11] || ''), x + 305.00 * scale + 48.00/2 * scale, y + 27.75 * scale);
+	
+	// other extras (positioned over their own boxes: leftExtra, dropExtra, rightExtra)
+	ctx.font = `${16 * scale}px Helvetica`;
+	ctx.fillText((keys[5] && keys[9] && keys[5] === keys[9]) ? '' : (keys[9] || ''), x + 180.00 * scale + 58.10/2 * scale, y + 140.65 * scale);
+	ctx.fillText((keys[6] && keys[12] && keys[6] === keys[12]) ? '' : (keys[12] || ''), x + 240.00 * scale + 58.10/2 * scale, y + 140.65 * scale);
+	ctx.fillText((keys[7] && keys[10] && keys[7] === keys[10]) ? '' : (keys[10] || ''), x + 300.00 * scale + 58.10/2 * scale, y + 140.65 * scale);
+	
 	ctx.font = prevFont;
 	ctx.restore();
 }
 
 // Draw the input-history UI box: short wide gray rectangle with 19 monospace characters
 function redrawInputHistory(historyStr, x, y, scale = 0.6, alpha = 0.45) {
-	// legacy stuffs:
-	// const keysHeight = 130.00 * scale;
-	// const boxX = x + 130;
-	// const boxY = y + keysHeight + 6 * scale;
-
 	// respect the history visibility flag (toggle O)
 	const histFlag = (typeof cachedShowHistory !== 'undefined' && cachedShowHistory !== null) ? cachedShowHistory : (bfdia5b.getItem('timerMod.showHistory') || '1');
 	if (histFlag == '0') return;
@@ -4087,17 +4108,20 @@ function buildCurrentInput(inLevel) { // inLevel distinguishes between which ver
 	if (_keysDown[keyMappings.switch]) str += "Z";
 	if (_keysDown[keyMappings.reset]) str += "r";
 	if (_keysDown[keyMappings.left]) str += "L";
+	if (_keysDown[keyMappings.leftExtra] && keyMappings.leftExtra !== keyMappings.left) str += (inLevel) ? "l" : "L*";
 	if (_keysDown[keyMappings.right]) str += "R";
+	if (_keysDown[keyMappings.rightExtra] && keyMappings.rightExtra !== keyMappings.right) str += (inLevel) ? "r" : "R*";
 	if (_keysDown[keyMappings.grab]) str += "U";
 	if (_keysDown[keyMappings.grabExtra] && keyMappings.grabExtra !== keyMappings.grab) str += (inLevel) ? "u" : "U*";
 	if (_keysDown[keyMappings.drop]) str += "D";
+	if (_keysDown[keyMappings.dropExtra] && keyMappings.dropExtra !== keyMappings.drop) str += (inLevel) ? "d" : "D*";
 	if (_keysDown[keyMappings.talk]) str += "E";
 	return str;
 }
 
 // THE SHORT STRING used in the display within level
 function handleInputHistory() {
-	let str = buildCurrentInput();
+	let str = buildCurrentInput(true);
 
 	// If no input and we're not currently active, do nothing
 	if (str.length === 0 && !inputHistoryIsActive) {
@@ -4137,7 +4161,7 @@ function initInputHistoryLongs() {
 	console.log("inputHistoryLongBests:",inputHistoryLongBests);
 }
 function updateInputHistoryLong() {
-	let str = buildCurrentInput();
+	let str = buildCurrentInput(false);
 	// if (str.length > 0) thisInputHistoryLong.push(str);
 	// else thisInputHistoryLong.push("-");
 	
@@ -4481,6 +4505,15 @@ function runLayoutEditor() {
 					break;
 				case 8:
 					label = keyCodeToLabel(keyMappings.grabExtra);
+					break;
+				case 9:
+					label = keyCodeToLabel(keyMappings.leftExtra);
+					break;
+				case 10:
+					label = keyCodeToLabel(keyMappings.dropExtra);
+					break;
+				case 11:
+					label = keyCodeToLabel(keyMappings.rightExtra);
 					break;
 			}
 		}
@@ -9008,17 +9041,20 @@ function mouseup(event) {
 }
 
 // in the case that you try to remap a key to one already in use, say no
-function compareOtherKeys(code, isGrab) {
+function compareOtherKeys(code, isGrab, isLeft, isDrop, isRight) {
 	// document.getElementById('TEMP').textContent = (code == keyMappings.jump) ? 'true' : 'false';
 	if (code == keyMappings.jump) return true;
 	else if (code == keyMappings.switch) return true;
 	else if (code == keyMappings.reset) return true;
-	else if (code == keyMappings.left) return true;
-	else if (code == keyMappings.right) return true;
+	else if (code == keyMappings.left && !isLeft) return true;
+	else if (code == keyMappings.right && !isRight) return true;
 	else if (code == keyMappings.grab && !isGrab) return true;
-	else if (code == keyMappings.drop) return true;
+	else if (code == keyMappings.drop && !isDrop) return true;
 	else if (code == keyMappings.talk) return true;
 	else if (code == keyMappings.grabExtra && !isGrab) return true;
+	else if (code == keyMappings.leftExtra && !isLeft) return true;
+	else if (code == keyMappings.dropExtra && !isDrop) return true;
+	else if (code == keyMappings.rightExtra && !isRight) return true;
 	return false;
 }
 
@@ -9032,40 +9068,52 @@ function keydown(event) {
 		if (typeof code !== 'undefined' && !isNaN(code)) {
 			switch (keyRemapListeningIndex) {
 				case 0:
-					if (compareOtherKeys(code, false)) break;
+					if (compareOtherKeys(code, false, false, false, false)) break;
 					keyMappings.jump = code;
 					break;
 				case 1:
-					if (compareOtherKeys(code, false)) break;
+					if (compareOtherKeys(code, false, false, false, false)) break;
 					keyMappings.switch = code;
 					break;
 				case 2:
-					if (compareOtherKeys(code, false)) break;
+					if (compareOtherKeys(code,  false, false, false, false)) break;
 					keyMappings.reset = code;
 					break;
 				case 3:
-					if (compareOtherKeys(code, false)) break;
+					if (compareOtherKeys(code,false, true, false, false)) break;
 					keyMappings.left = code;
 					break;
 				case 4:
-					if (compareOtherKeys(code, false)) break;
+					if (compareOtherKeys(code, false, false, false, true)) break;
 					keyMappings.right = code;
 					break;
 				case 5:
-					if (compareOtherKeys(code, true)) break;
+					if (compareOtherKeys(code, true, false, false, false)) break;
 					keyMappings.grab = code;
 					break;
 				case 6:
-					if (compareOtherKeys(code, false)) break;
+					if (compareOtherKeys(code, false, false, true, false)) break;
 					keyMappings.drop = code;
 					break;
 				case 7:
-					if (compareOtherKeys(code, false)) break;
+					if (compareOtherKeys(code, false, false, false, false)) break;
 					keyMappings.talk = code;
 					break;
 				case 8:
-					if (compareOtherKeys(code, true)) break;
+					if (compareOtherKeys(code, true, false, false, false)) break;
 					keyMappings.grabExtra = code;
+					break;
+				case 9:
+					if (compareOtherKeys(code, false, true, false, false)) break;
+					keyMappings.leftExtra = code;
+					break;
+				case 10:
+					if (compareOtherKeys(code, false, false, true, false)) break;
+					keyMappings.dropExtra = code;
+					break;
+				case 11:
+					if (compareOtherKeys(code, false, false, false, true)) break;
+					keyMappings.rightExtra = code;
 					break;
 			}
 			bfdia5b.setItem('timerMod.keyMappings', JSON.stringify(keyMappings));
@@ -9587,24 +9635,25 @@ function draw() {
 					if (recover) {
 						char[control].justChanged = 2;
 						if (recoverTimer == 0) {
-							if (_keysDown[keyMappings.left]) {
+							if (_keysDown[keyMappings.left] || _keysDown[keyMappings.leftExtra]) {
 								if (!leftPress) recoverCycle(HPRC2, -1);
 								leftPress = true;
 							} else leftPress = false;
-							if (_keysDown[keyMappings.right]) {
+							if (_keysDown[keyMappings.right] || _keysDown[keyMappings.rightExtra]) {
 								if (!rightPress) recoverCycle(HPRC2, 1);
 								rightPress = true;
 							} else rightPress = false;
 						}
 					} else {
 						if (cornerHangTimer == 0) {
-							if (_keysDown[keyMappings.left]) {
+							if (_keysDown[keyMappings.left] || _keysDown[keyMappings.leftExtra]) {
 								char[control].moveHorizontal(-power);
-							} else if (_keysDown[keyMappings.right]) {
+							} else if (_keysDown[keyMappings.right] || _keysDown[keyMappings.rightExtra]) {
 								char[control].moveHorizontal(power);
 							}
 						}
-						if (!_keysDown[keyMappings.left] && !_keysDown[keyMappings.right]) char[control].stopMoving();
+						if (!(_keysDown[keyMappings.left] || _keysDown[keyMappings.leftExtra])
+							&& !(_keysDown[keyMappings.right] || _keysDown[keyMappings.rightExtra])) char[control].stopMoving();
 					}
 					// maintaining typical OS functionality; you can press either grab key to grab
 					if ((_keysDown[keyMappings.grab] || _keysDown[keyMappings.grabExtra])) {
@@ -9662,7 +9711,7 @@ function draw() {
 						}
 						upPress = true;
 					} else upPress = false;
-					if (_keysDown[keyMappings.drop]) {
+					if (_keysDown[keyMappings.drop] || _keysDown[keyMappings.dropExtra]) {
 						if (!downPress) {
 							if (char[control].carry) putDown(control);
 							else if (recover) {
