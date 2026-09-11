@@ -20,6 +20,7 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 -Fixed issue where win tokens weren't respawning when loading from a state before grabbing win token. (WT collect flash is still not quite working; that's a more complicated issue.)
 -Added warning for reloading/closing page while autosplitter timer is active and hasn't been reset yet. (This has caused issues with PBs and gold splits not saving after closing page; there's no easy fix, but this is the easiest remedy and also how LiveSplit behaves.)
 -Fixed bug where inactive autosplitter started while playing Level 1 in an existing save file.
+-Small stylistic changes to Speedrun Mode buttons.
 
 04/05/26:
 -Added an input history tracker for each level; this will track the input sequence of your best and most-recent playthroughs of each state, which you can view and copy by clicking the eyeball icon next to the desired level. You can then replay this string on Coppersalts's TAS software. If you're concerned about this feature lagging your game (though I ran tests and it generally performs well), you can disable this feature in the Options menu. [NOTE: I've noticed that the strings are sometimes (though quite rarely) recorded slightly inaccurately. So while they are mostly accurate, you may have to tweak a frame here and there.]
