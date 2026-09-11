@@ -114,6 +114,7 @@ let categoryData = [
 	{name: 'icecubesegment', start: 41, end: 51},
 	{name: 'any%', start: 0, end: 51},
 	{name: '100%', start: 0, end: 51},
+	{name: 'allwintokens', start: 0, end: 51},
 ]
 // Livesplit category definitions and helpers
 function findCategoryByName(name) {
@@ -202,13 +203,14 @@ let enableExperimentalFeatures = window.location.hostname==='localhost';
 let screenShake = true;
 let screenFlashes = true;
 let frameRateThrottling = false;
-let slowTintsEnabled = true;
+let slowTintsEnabled = false;
 let speedrunPracticeMode = true; // this enables/disables all speedrun features except for the livesplit timer
 let inputHistoryTracking = true;
+let allWinTokensMode = false;
 
 let speedrunPracticeBtns = [];
 let fastRestart = false; // speedrun mod thing
-let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode', 'Input History Tracking'];
+let optionText = ['Screen Shake','Screen Flashes','Quirks Mode','Experimental Features','Frame Rate Throttling', 'Slow Tints', 'Speedrun Practice Mode', 'Input History Tracking', 'All Win Tokens Mode'];
 
 // speedrun mod:
 let keyRemapsText = ['Jump','Switch player','Reset level','Move left','Move right', 'Grab/Throw object', 'Drop object', 'Advance dialogue', 'Additional "up" input', 'Additional left input', 'Additional drop input', 'Additional right input'];
@@ -430,7 +432,7 @@ function loadFastestRun() {
 }
 
 function saveSettings() {
-	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled, speedrunPracticeMode, inputHistoryTracking]));
+	bfdia5b.setItem('settings', JSON.stringify([screenShake, screenFlashes, quirksMode, enableExperimentalFeatures, frameRateThrottling, slowTintsEnabled, speedrunPracticeMode, inputHistoryTracking, allWinTokensMode]));
 	toggleSpeedrunPracticeMode();
 }
 
@@ -447,6 +449,7 @@ function getSavedSettings() {
 		slowTintsEnabled = settingsArray[5];
 		speedrunPracticeMode = settingsArray[6];
 		inputHistoryTracking = settingsArray[7];
+		allWinTokensMode = settingsArray[8];
 	}
 	// Load persisted key mappings (supports new JSON object/array format and legacy comma list)
 	const savedKeyMappingsRaw = bfdia5b.getItem('timerMod.keyMappings');
@@ -2838,7 +2841,7 @@ async function loadingScreen() {
 	ctx.textBaseline = 'middle';
 	ctx.font = '30px Helvetica';
 	
-	// Choose loading message: 50% chance of alternate, 50% chance of "Loading..."
+	// Choose loading message: 50% chance of something fun, 50% chance of "Loading..."
 	let loadingMessage = Math.random() < 0.5 ? 'Loading...' : loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
 	ctx.fillText(loadingMessage, cwidth / 2, cheight / 2);
 
@@ -2852,76 +2855,79 @@ async function loadingScreen() {
 	req = await fetch('data/images6.json');
 	let resourceData = await req.json();
 
-	svgCSBubble = await createImage(resourceData['ui/csbubble/dia.svg']);
-	svgHPRCCrank = await createImage(resourceData['entities/e0035crank.svg']);
-	svgCoin = await createImage(resourceData['wintoken.svg']);
-	svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
-	svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
-	for (let i = 0; i < imgBgs.length; i++) {
-		imgBgs[i] = await createImage(resourceData['bg/bg' + i.toString().padStart(4, '0') + '.png']);
-	}
-	for (let i = 0; i < blockProperties.length; i++) {
-		let id = i.toString().padStart(4, '0');
-		if (blockProperties[i][16] == 1 || (blockProperties[i][15] && blockProperties[i][16] == 0)) {
-			svgTiles[i] = await createImage(resourceData['blocks/b' + id + '.svg']);
-			svgTilesVB[i] = getVB(resourceData['blocks/b' + id + '.svg']);
-		} else if (blockProperties[i][16] > 1) {
-			svgTiles[i] = new Array(blockProperties[i][16]);
-			svgTilesVB[i] = new Array(blockProperties[i][16]);
-			for (let j = 0; j < svgTiles[i].length; j++) {
-				svgTiles[i][j] = await createImage(
-					resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
-				);
-				svgTilesVB[i][j] = getVB(resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
+	let loadMostAssets = true; // just for testing
+	if (loadMostAssets) {
+		svgCSBubble = await createImage(resourceData['ui/csbubble/dia.svg']);
+		svgHPRCCrank = await createImage(resourceData['entities/e0035crank.svg']);
+		svgCoin = await createImage(resourceData['wintoken.svg']);
+		svgIceCubeMelt = await createImage(resourceData['effects/icecubemelt.svg']);
+		for (let i = 0; i < imgBgs.length; i++) {
+			imgBgs[i] = await createImage(resourceData['bg/bg' + i.toString().padStart(4, '0') + '.png']);
+		}
+		for (let i = 0; i < blockProperties.length; i++) {
+			let id = i.toString().padStart(4, '0');
+			if (blockProperties[i][16] == 1 || (blockProperties[i][15] && blockProperties[i][16] == 0)) {
+				svgTiles[i] = await createImage(resourceData['blocks/b' + id + '.svg']);
+				svgTilesVB[i] = getVB(resourceData['blocks/b' + id + '.svg']);
+			} else if (blockProperties[i][16] > 1) {
+				svgTiles[i] = new Array(blockProperties[i][16]);
+				svgTilesVB[i] = new Array(blockProperties[i][16]);
+				for (let j = 0; j < svgTiles[i].length; j++) {
+					svgTiles[i][j] = await createImage(
+						resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
+					);
+					svgTilesVB[i][j] = getVB(resourceData['blocks/b' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
+				}
 			}
 		}
-	}
-	for (let i = 0; i < svgLevers.length; i++) {
-		svgLevers[i] = await createImage(resourceData['blocks/b' + i.toString().padStart(2, '0') + 'lever.svg']);
-	}
-	for (let i = 0; i < svgShadows.length; i++) {
-		svgShadows[i] = await createImage(resourceData['shadows/s' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgTileBorders.length; i++) {
-		svgTileBorders[i] = await createImage(resourceData['borders/tb' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < charD.length; i++) {
-		let id = i.toString().padStart(4, '0');
-		if (charD[i][7] < 1) continue;
-		else if (charD[i][7] == 1) {
-			svgChars[i] = await createImage(resourceData['entities/e' + id + '.svg']);
-			svgCharsVB[i] = getVB(resourceData['entities/e' + id + '.svg']);
-		} else {
-			svgChars[i] = new Array(charD[i][7]);
-			svgCharsVB[i] = new Array(charD[i][7]);
-			for (let j = 0; j < svgChars[i].length; j++) {
-				svgChars[i][j] = await createImage(
-					resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
-				);
-				svgCharsVB[i][j] = getVB(resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
+		for (let i = 0; i < svgLevers.length; i++) {
+			svgLevers[i] = await createImage(resourceData['blocks/b' + i.toString().padStart(2, '0') + 'lever.svg']);
+		}
+		for (let i = 0; i < svgShadows.length; i++) {
+			svgShadows[i] = await createImage(resourceData['shadows/s' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgTileBorders.length; i++) {
+			svgTileBorders[i] = await createImage(resourceData['borders/tb' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < charD.length; i++) {
+			let id = i.toString().padStart(4, '0');
+			if (charD[i][7] < 1) continue;
+			else if (charD[i][7] == 1) {
+				svgChars[i] = await createImage(resourceData['entities/e' + id + '.svg']);
+				svgCharsVB[i] = getVB(resourceData['entities/e' + id + '.svg']);
+			} else {
+				svgChars[i] = new Array(charD[i][7]);
+				svgCharsVB[i] = new Array(charD[i][7]);
+				for (let j = 0; j < svgChars[i].length; j++) {
+					svgChars[i][j] = await createImage(
+						resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']
+					);
+					svgCharsVB[i][j] = getVB(resourceData['entities/e' + id + 'f' + j.toString().padStart(4, '0') + '.svg']);
+				}
 			}
 		}
+		for (let i = 0; i < svgBodyParts.length; i++) {
+			svgBodyParts[i] = await createImage(resourceData['bodyparts/bp' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgHPRCBubble.length; i++) {
+			svgHPRCBubble[i] = await createImage(
+				resourceData['ui/hprcbubble/hprcbubble' + i.toString().padStart(4, '0') + '.svg']
+			);
+		}
+		for (let i = 0; i < svgCoinGet.length; i++) {
+			svgCoinGet[i] = await createImage(resourceData['effects/wtgetf' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgFire.length; i++) {
+			svgFire[i] = await createImage(resourceData['effects/fire' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgBurst.length; i++) {
+			svgBurst[i] = await createImage(resourceData['effects/burst' + i.toString().padStart(4, '0') + '.svg']);
+		}
+		for (let i = 0; i < svgAcidDrop.length; i++) {
+			svgAcidDrop[i] = await createImage(resourceData['effects/aciddrop' + i.toString().padStart(4, '0') + '.svg']);
+		}
 	}
-	for (let i = 0; i < svgBodyParts.length; i++) {
-		svgBodyParts[i] = await createImage(resourceData['bodyparts/bp' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgHPRCBubble.length; i++) {
-		svgHPRCBubble[i] = await createImage(
-			resourceData['ui/hprcbubble/hprcbubble' + i.toString().padStart(4, '0') + '.svg']
-		);
-	}
-	for (let i = 0; i < svgCoinGet.length; i++) {
-		svgCoinGet[i] = await createImage(resourceData['effects/wtgetf' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgFire.length; i++) {
-		svgFire[i] = await createImage(resourceData['effects/fire' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgBurst.length; i++) {
-		svgBurst[i] = await createImage(resourceData['effects/burst' + i.toString().padStart(4, '0') + '.svg']);
-	}
-	for (let i = 0; i < svgAcidDrop.length; i++) {
-		svgAcidDrop[i] = await createImage(resourceData['effects/aciddrop' + i.toString().padStart(4, '0') + '.svg']);
-	}
+
 	svgMenu0 = await createImage(resourceData['menu0.svg']);
 	svgMenuBg = await createImage('visuals/5blazit_menu_bg.png');
 	svgMenuOverlay = await createImage('visuals/5blazit_menu_overlay.png');
@@ -2946,6 +2952,19 @@ window.onload = function () {
 	initTimerKeysCache();
 	loadingScreen();
 };
+
+// this is in the case that the autosplitter is either still running or hasn't been reset; PB and golds wouldn't save if page is closed
+window.addEventListener('beforeunload', (event) => {
+	// TODO: make something like this:
+	/* // Queue a function to run ONLY if they hit 'Cancel'
+	setTimeout(() => {
+		showValidationAlert();
+	}, 100); */
+	if (sessionTimerAccum > 0) {
+		event.preventDefault();
+		event.returnValue = '';
+	}
+})
 
 // Populate speedrun-related button references once DOM is ready
 document.addEventListener('DOMContentLoaded', function () {
@@ -3002,6 +3021,7 @@ function getSavedSettings() {
 		slowTintsEnabled = settingsArray[5];
 		speedrunPracticeMode = settingsArray[6];
 		inputHistoryTracking = settingsArray[7];
+		allWinTokensMode = settingsArray[8];
 	}
 
 	// Load persisted key mappings (supports JSON arrays/objects and the legacy comma list)
@@ -4641,7 +4661,8 @@ function playLevel(i) {
 	if (i == levelProgress) playMode = 0;
 	else if (i < levelProgress) playMode = 1;
 	// Start session timer if playing level 1 and timer hasn't started yet
-	if (i === 0 && (splitCategory.name === 'any%' || splitCategory.name === 'booksegment' || splitCategory.name === '100%')) {
+	if (i === 0 && timer === 0 && (splitCategory.name !== 'matchsegment' && splitCategory.name !== 'icecubesegment')
+				&& (splitCategory.name === 'allwintokens' !== !allWinTokensMode)) {
 		startSessionTimer();
 	}
 
@@ -5714,6 +5735,10 @@ function getCoin(i) {
 			Math.ceil(char[i].y / 30) - 1 >= locations[3]
 		) {
 			gotThisCoin = true;
+			if (allWinTokensMode) {
+				transitionType = 1;
+				wipeTimer = 1;
+			}
 		}
 	}
 }
@@ -9528,7 +9553,7 @@ function draw() {
 					resetLevel();
 				} 
 
-				if (charsAtEnd >= charCount2) {
+				if (charsAtEnd >= charCount2 || (allWinTokensMode && gotThisCoin)) {
 					// beat the level!
 					let isBest = false;
 					let isBestComp = false;
@@ -9537,8 +9562,6 @@ function draw() {
 						coins++;
 						// bonusProgress = Math.floor(coins * 0.33);
 					}
-					// timer += getTimerCached - levelTimer2; // Removed: timer is added below in the level end logic
-
 					
 					if ((getTimerCached - levelTimer2).toFixed(0) < (best[currentLevel] || Infinity)) {
 						best[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
@@ -9586,7 +9609,6 @@ function draw() {
 					if (!freezeLevelTimer) {
 						timer += getTimerCached - levelTimer2;
 					}
-
 					if (playMode == 0 && !stayInLevel) {
 						currentLevel++;
 						if (!quirksMode) toSeeCS = true; // This line was absent in the original source, but without it dialogue doesn't play after level 1 when on a normal playthrough.
@@ -10124,6 +10146,7 @@ function draw() {
 							bounce(i);
 						}
 						getCoin(i);
+						// TODO if setting active, set wipe timer after grabbing WT
 					}
 					if (char[i].deathTimer < 30) {
 						if (char[i].id == 5 && char[i].deathTimer >= 7) {
@@ -10207,7 +10230,7 @@ function draw() {
 							if (!char[i].atEnd) {
 								charsAtEnd++;
 								doorLightFadeDire[charsAtEnd - 1] = 1;
-								if (charsAtEnd >= charCount2) {
+								if (charsAtEnd >= charCount2 && !allWinTokensMode) {
 									wipeTimer = 1;
 									if (playMode == 0) {
 										transitionType = 1;
@@ -11767,7 +11790,8 @@ function draw() {
 			ctx.font = '26px Helvetica';
 
 			for (var i = 0; i < optionText.length; i++) {
-				let y = i*50 + 150;
+				let y = i*45 + 55;
+				y = (i >= 6) ? y + 50 : y;
 				ctx.fillStyle = '#444444';
 				ctx.fillRect(590, y, 50, 28);
 				ctx.fillStyle = '#ffffff';
@@ -11800,6 +11824,9 @@ function draw() {
 					case 7:
 						thisOptionValue = inputHistoryTracking;
 						break;
+					case 8:
+						thisOptionValue = allWinTokensMode;
+						break;
 				}
 				ctx.fillStyle = thisOptionValue?'#00ff00':'#ff0000';
 				ctx.fillText(thisOptionValue?'on':'off', 615, y+2);
@@ -11831,6 +11858,9 @@ function draw() {
 								break;
 							case 7:
 								inputHistoryTracking = !inputHistoryTracking;
+								break;
+							case 8:
+								allWinTokensMode = !allWinTokensMode;
 								break;
 						}
 					}
@@ -12255,8 +12285,11 @@ let recoverBackup = false;
 let recover2Backup = null;
 let cutSceneBackup = null; // for dialogue
 let toSeeCSBackup = null;
+let gotThisCoinBackup = null;
+//TODO WT animation is saved in svgCoinGet[]; state is hard to store because it requires knowing the specified (x,y) coords for that block
 
 let levelHasBeenSaved = false; // check for whether a load is valid here or not
+
 function saveState() {
 	// document.getElementById('TEMP').textContent = char[0].y;
 	charBackups = new Array(charCount);
@@ -12286,6 +12319,8 @@ function saveState() {
 
 	cutSceneBackup = structuredClone(cutScene);
 	toSeeCSBackup = structuredClone(toSeeCS);
+
+	gotThisCoinBackup = gotThisCoin;
 }
 
 function loadState() {
@@ -12330,15 +12365,14 @@ function loadState() {
 	if (recover2Backup !== null) recover2 = recover2Backup;
 	if (cutSceneBackup !== null) cutScene = cutSceneBackup;
 	if (toSeeCSBackup !== null) toSeeCS = toSeeCSBackup;
+	if (gotThisCoinBackup !== null) gotThisCoin = gotThisCoinBackup;
 
 	// advance to next frame so that we can actually see the load happen
 	advanceFrame();
 	// nice try
 	resetSessionTimer();
 
-	// console.log(char[1]);
-	// console.log("switchable:",switchable);
-	// console.log("switches:",switches);
+	
 }
 
 // Explore API Stuff

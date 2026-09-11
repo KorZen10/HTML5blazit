@@ -29,6 +29,7 @@
 					<option value="booksegment">Book Segment (1–19)</option>
 					<option value="matchsegment">Match Segment (19–42)</option>
 					<option value="icecubesegment">Ice Cube Segment (42-52)</option>
+					<option value="allwintokens">All Win Tokens</option>
 				</select>&nbsp;
 			</div>
 			<div id="timer-display">0:00.00</div>
@@ -38,9 +39,9 @@
 	<br>
 	<br>
 	<div style="display: flex; justify-content: center;">
-		<button id="toggleSplits" onclick="deleteSplitVisual()">Remove Splits Visual</button>&nbsp;
-		<button id="clearSplitsFromStorage" onclick="if (confirm('Clear fastest run data from storage? This will only remove the data for this category, but it cannot be undone.')) {clearFastestRun();}">Clear Fastest Run Data</button>&nbsp;
-		<button id="copyPbSplits" onclick="copyPbSplits()">Copy PB Splits</button>&nbsp;
+		<button class="speedrun-btn-top" id="toggleSplits" onclick="deleteSplitVisual()">Remove Splits Visual</button>&nbsp;
+		<button class="speedrun-btn-top" id="clearSplitsFromStorage" onclick="if (confirm('Clear fastest run data from storage? This will only remove the data for this category, but it cannot be undone.')) {clearFastestRun();}">Clear Fastest Run Data</button>&nbsp;
+		<button class="speedrun-btn-top" id="copyPbSplits" onclick="copyPbSplits()">Copy PB Splits</button>&nbsp;
 	</div>
 	<div id="reload-text">[If this doesn't go away, reload page]</div>
 	<div id="center">
@@ -48,12 +49,12 @@
 			<canvas width="960" height="540" id="cnv" contenteditable="false"></canvas>
 		</div>
 		<div style="justify-content: center; display: flex; width: 100%">
-			<div style="justify-content: center; width: 130px">
-				<h2>Time Warp</h2>
-				<div>(Hotkeys: 1-9 + 0)</div>
+			<div style="justify-content: center; width: 100px">
+				<h3>Time Warp</h2>
+				<div style="font-size: 12px; font-weight: bold;">(Hotkeys: 1-9 + 0)</div>
 			</div>
 			<div>
-				<input id="fps-slider" tabindex="-1" type="range" min="1" max="10" value="10" class="snap-range-input" style="width: 300px;" 
+				&nbsp;&nbsp;<input id="fps-slider" tabindex="-1" type="range" min="1" max="10" value="10" class="snap-range-input" style="width: 280px;" 
 					onchange="setFps(document.getElementById('fps-slider').value*6)" onfocus="this.blur()">
 				<div class="range-tick-labels" style="display: flex; justify-content: center">
 					<span class="tick-label" style="margin-left: 12px; margin-right: 8px; left: 0%;">|<br>10%</span>

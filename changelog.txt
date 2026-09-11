@@ -1,22 +1,25 @@
 THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
-   Try idea to fix lag
 1) Fix lever position not updating after 2 load states
-   Fix HPRC load state issues
-   Fix win token load state issues
-   Hide/disable splits option ✅
-   Copy best times button ✅
-   Fix input display when showing symbols ✅
-   Make remappable inputs for secondary numpad keys
-   Make practice mode hotkeys remappable
-   Add death counter to layout
-   Fix desync between final time and last split cumul time
-   Add confirm if closing window while splits haven't been reset yet
-2) Make a vertical Livesplit Layout
-3) Fix input sequences sometimes being recorded slightly inaccurately
+2) Try idea to fix lag (I have a thought...)
+3) Make practice mode hotkeys remappable
 4) Add ability to add custom categories (and remove them too)
+5) Add death counter to layout
+6) Fix desync between final time and last split cumul time
+7) Fix HPRC load state issues 🔜 [I forgot what the issue was here]
+8) Make a vertical Livesplit Layout
+9) Fix input sequences sometimes being recorded slightly inaccurately
 ?) Got any more ideas? DM me on Discord!: @korzenten
+
+09/11/26:
+-Added the ability to map a second numpad key to the key of your choice. This functionality already existed with just the up key, but now it also exists with the rest of the keys!
+-Added a new toggle in Options: "All Win Tokens Mode". This is made for the new upcoming "All Win Tokens" category extension! Instead of reaching the door to beat the level, you instead grab the win token. Very fun! Additionally, there is a new autosplitter category specifically for this gamemode; because of its uniqueness, the timer will only start if you have the mode turned on and the category selected (the timer will also only start for all other categories if you have the mode turned off).
+-Fixed keys remapped to symbols showing weird garbage characters in the input display.
+-Added two buttons under the split display: a "Remove Splits Visual" button (this is intended to assist in reducing lag, but it is still a work in progress) and a "Copy PB Splits" button that makes it easier to track.
+-Fixed issue where win tokens weren't respawning when loading from a state before grabbing win token. (WT collect flash is still not quite working; that's a more complicated issue.)
+-Added warning for reloading/closing page while autosplitter timer is active and hasn't been reset yet. (This has caused issues with PBs and gold splits not saving after closing page; there's no easy fix, but this is the easiest remedy and also how LiveSplit behaves.)
+-Fixed bug where inactive autosplitter started while playing Level 1 in an existing save file.
 
 04/05/26:
 -Added an input history tracker for each level; this will track the input sequence of your best and most-recent playthroughs of each state, which you can view and copy by clicking the eyeball icon next to the desired level. You can then replay this string on Coppersalts's TAS software. If you're concerned about this feature lagging your game (though I ran tests and it generally performs well), you can disable this feature in the Options menu. [NOTE: I've noticed that the strings are sometimes (though quite rarely) recorded slightly inaccurately. So while they are mostly accurate, you may have to tweak a frame here and there.]

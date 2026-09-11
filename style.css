@@ -177,20 +177,29 @@ p{
 	font-weight: bold;
 }
 
-/* broken for some reason */
 .speedrun-btn {
-	height: 40px;
-	width: 90px;
+	height: 36px;
+	width: 80px;
 	font-weight: bold;
-	font-size: 14px;
+	font-size: 13px;
+	border-width: 2px;
+	margin-right: 5px;
+	border-radius: 5px;
+}
+
+.speedrun-btn-top {
+	height: 25px;
+	width: 180px;
+	font-weight: bold;
+	font-size: 12px;
 	border-width: 2px;
 	margin-right: 5px;
 	border-radius: 5px;
 }
 
 .tick-label {
-	width: 12px;
-	font-size: 12px;
+	width: 10px;
+	font-size: 11px;
 	font-weight: bold;
 
 }
