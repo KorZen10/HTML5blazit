@@ -390,7 +390,10 @@ getSavedGame();
 getSavedSettings();
 
 function saveFastestRun() {
-	bfdia5b.setItem(getSplitKey('fastestRunTime'), fastestRunTime === null ? 'null' : fastestRunTime.toString());
+	const savedTime = bfdia5b.getItem(getSplitKey('fastestRunTime'));
+	if (savedTime !== null) {
+		fastestRunTime = parseInt(savedTime, 10);
+	}
 	const cumulArr = ensureCumulArrayForCurrentCategory();
 	const entryArr = ensureEntryArrayForCurrentCategory();
 	bfdia5b.setItem(getSplitKey('fastestRunCumulTimes'), cumulArr.map(t => t === null ? 'null' : t.toString()).join(','));
@@ -2438,8 +2441,8 @@ function toMMSSms(ms) {
 	return minStr + ':' + _mmss_seconds[seconds] + '.' + _mmss_msecs[msecs];
 }
 
+let timerDisplay = null; // this will be set when autosplitter is initialized
 function updateSessionTimerDisplay() {
-	const timerDisplay = document.getElementById('timer-display');
 	if (timerDisplay) {
 		const ms = getSessionTimerMs();
 		if (timerDisplay) timerDisplay.textContent = toMMSSms(ms);
@@ -2480,7 +2483,7 @@ function stopSessionTimer() {
 function compareFastestRun() {	
 	if (runFinished || levelProgress > getFurthestProgress()) {
 		setFurthestProgress(levelProgress);
-		if (fastestRunTime === null || sessionTimerAccum < fastestRunTime) {
+		if (fastestRunTime === null || fastestRunTime === "NaN" || sessionTimerAccum < fastestRunTime) {
 			// New fastest run!
 			if (runFinished) fastestRunTime = sessionTimerAccum;
 			// Save under current category
@@ -2591,7 +2594,6 @@ function updateSplitTime(levelId) {
 	// If a time exists for this split, calculate a different time (lol I know this sucks). Else, use times from the fastest run.
 	if (sessionSplitTimes !== "undefined" && sessionSplitTimes[levelId] != null) {
 		value = getSessionTimerMs() - prevSplitSessionTime;
-		console.log(value)
 	}
 	else {
 		const entryArr = ensureEntryArrayForCurrentCategory();
@@ -4178,7 +4180,6 @@ function initInputHistoryLongs() {
 	inputHistoryLongBests = loadStoredInputHistoryLongs('timerMod.inputHistoryLongBests');
 	inputHistoryLongPrevs = loadStoredInputHistoryLongs('timerMod.inputHistoryLongPrevs');
 	inputHistoryLongComps = loadStoredInputHistoryLongs('timerMod.inputHistoryLongComps');
-	console.log("inputHistoryLongBests:",inputHistoryLongBests);
 }
 function updateInputHistoryLong() {
 	let str = buildCurrentInput(false);
@@ -9439,6 +9440,29 @@ function setup() {
 		// Document already ready
 		createLivesplitEntries();
 		updateAllLivesplitEntries();
+		timerDisplay = document.getElementById('timer-display');
+		checkSiteUpdates();
+	}
+}
+
+async function checkSiteUpdates() {
+	const response = await fetch('changelog.txt', { cache: 'no-store' });
+
+	const changelogText = await response.text();
+	const encoded = new TextEncoder().encode(changelogText);
+	const digestBuffer = await crypto.subtle.digest('SHA-256', encoded);
+	const hash = Array.from(new Uint8Array(digestBuffer))
+		.map(b => b.toString(16).padStart(2, '0'))
+		.join('');
+
+	const savedHash = bfdia5b.getItem('changelogHash');
+	if (savedHash === null) {
+		bfdia5b.setItem('changelogHash', hash);
+		return;
+	}
+
+	if (savedHash !== hash) {
+		alert("NEW SITE UPDATE RELEASED!!! Click the link to the changelog below to check out what's new!");
 	}
 }
 
@@ -9567,10 +9591,6 @@ function draw() {
 						best[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
 						isBest = true;
 					}
-					// TODO condition doesn't quite work bc gotCoin doesn't reset after level ends
-					console.log("(getTimerCached - levelTimer2).toFixed(0):",(getTimerCached - levelTimer2).toFixed(0));
-					console.log("(comp[currentLevel] || Infinity):",(comp[currentLevel] || Infinity));
-					console.log("gotThisCoin:",gotThisCoin);
 					if ((getTimerCached - levelTimer2).toFixed(0) < (comp[currentLevel] || Infinity) && gotThisCoin) {
 						comp[currentLevel] = (getTimerCached - levelTimer2).toFixed(0);
 						isBestComp = true;
@@ -12182,7 +12202,6 @@ let then = window.performance.now();
 let lastFrameReq = then;
 let interval = 1000 / fps;
 let globalDelta;
-
 
 function rAF60fps() {
 	requestAnimationFrame(rAF60fps);
