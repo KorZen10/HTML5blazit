@@ -1,19 +1,23 @@
 THIS IS THE CHANGELOG FOR KORZEN'S BFDIA 5b SPEEDRUN MOD!
 
 PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
-1) Fix lever position not updating after 2 load states
+1) Add simplified autosplitter timer (only increments once a second to maybe improve performance)
 2) Make practice mode hotkeys remappable
 3) Add ability to add custom categories (and remove them too)
 4) Add death counter to layout
 5) Fix desync between final time and last split cumul time
 6) Fix HPRC load state issues 🔜 [I forgot what the issue was here]
-7) Make a vertical Livesplit Layout
+7) Make a vertical autosplitter Layout
 8) Fix input sequences sometimes being recorded slightly inaccurately
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
-09/13/25:
+09/16/26:
+-Fixed bug where loading a savestate multiple times during a lever/button actuation caused the lever/button's physical state to not reset.
+-Fixed bug where changelog update alert was appearing every time page was opened.
+
+09/13/26:
 -Fixed bug where autosplitter does not save any run after first run if that first run was reset before it was completed.
--Potentially caught a very significant performance sink involving the autosplitter timer. May require further testing.
+-Potentially caught a very significant performance sink involving the autosplitter timer. May require further testing. (update: the improvement was pretty minor)
 -Created the alert for any changelog updates.
 
 09/11/26:

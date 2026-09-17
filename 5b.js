@@ -9456,13 +9456,13 @@ async function checkSiteUpdates() {
 		.join('');
 
 	const savedHash = bfdia5b.getItem('changelogHash');
-	if (savedHash === null) {
-		bfdia5b.setItem('changelogHash', hash);
-		return;
-	}
+	console.log("hash:",hash,"savedHash:",savedHash);
 
 	if (savedHash !== hash) {
 		alert("NEW SITE UPDATE RELEASED!!! Click the link to the changelog below to check out what's new!");
+	
+		bfdia5b.setItem('changelogHash', hash);
+		return;
 	}
 }
 
@@ -12351,7 +12351,7 @@ function loadState() {
 	// dependent structures (tileFrames, tileDepths, shadows, static tile canvas).
 	if (thisLevelBackup) {
 		// Rebuild thisLevel and tile-related arrays from the backup.
-		copyLevel(thisLevelBackup);
+		copyLevel(structuredClone(thisLevelBackup));
 		tileDepths = [[], [], [], []];
 		getTileDepths();
 		calculateShadowsAndBorders();
@@ -12359,18 +12359,18 @@ function loadState() {
 	}
 
 	// restore the tile states
-	if (tileFramesBackup !== null) tileFrames = tileFramesBackup;
+	if (tileFramesBackup !== null) tileFrames = structuredClone(tileFramesBackup);
 
 	// Restore characters from their backups
 	for (let i = 0; i < charCount; i++) {
-		char[i].setVars(charBackups[i]);
+		char[i].setVars(structuredClone(charBackups[i]));
 		// Clear stoodOnBy arrays since they need to be recalculated by physics in the next frame
 		char[i].stoodOnBy = [];
 	}
 
 	// Restore control and recover timer so the saved player regains input
-	if (typeof controlBackup !== 'undefined') control = controlBackup;
-	if (typeof recoverTimerBackup !== 'undefined') recoverTimer = recoverTimerBackup;
+	if (typeof controlBackup !== 'undefined') control = structuredClone(controlBackup);
+	if (typeof recoverTimerBackup !== 'undefined') recoverTimer = structuredClone(recoverTimerBackup);
 
 	// Recalculate charsAtEnd based on restored character states (and update the lights)
 	charsAtEnd = 0;
@@ -12380,18 +12380,16 @@ function loadState() {
 		doorLightFadeDire[i] = 0;
 	}
 
-	if (recoverBackup !== null) recover = recoverBackup;
-	if (recover2Backup !== null) recover2 = recover2Backup;
-	if (cutSceneBackup !== null) cutScene = cutSceneBackup;
-	if (toSeeCSBackup !== null) toSeeCS = toSeeCSBackup;
+	if (recoverBackup !== null) recover = structuredClone(recoverBackup);
+	if (recover2Backup !== null) recover2 = structuredClone(recover2Backup);
+	if (cutSceneBackup !== null) cutScene = structuredClone(cutSceneBackup);
+	if (toSeeCSBackup !== null) toSeeCS = structuredClone(toSeeCSBackup);
 	if (gotThisCoinBackup !== null) gotThisCoin = gotThisCoinBackup;
 
 	// advance to next frame so that we can actually see the load happen
 	advanceFrame();
 	// nice try
 	resetSessionTimer();
-
-	
 }
 
 // Explore API Stuff
@@ -12748,7 +12746,7 @@ class Character {
 		this.deathTimer = savedData.deathTimer;
 		this.charState = savedData.charState;
 		this.standingOn = savedData.standingOn;
-		this.stoodOnBy = savedData.stoodOnBy
+		this.stoodOnBy = structuredClone(savedData.stoodOnBy);
 		this.w = savedData.w;
 		this.h = savedData.h;
 		this.weight = savedData.weight;
@@ -12759,8 +12757,8 @@ class Character {
 		this.fricGoal = savedData.fricGoal;
 		this.justChanged = savedData.justChanged;
 		this.speed = savedData.speed;
-		this.motionString = savedData.motionString
-		this.buttonsPressed = savedData.buttonsPressed
+		this.motionString = savedData.motionString;
+		this.buttonsPressed = structuredClone(savedData.buttonsPressed);
 		this.pcharState = savedData.pcharState;
 		this.submerged = savedData.submerged;
 		this.temp = savedData.temp;
