@@ -12185,7 +12185,7 @@ function draw() {
 
 	_frameCount++;
 	// Update session timer display
-	if (sessionTimerRunning) updateSessionTimerDisplay();
+	// if (sessionTimerRunning) updateSessionTimerDisplay();
 	// if (_frameCount % 6 === 0 && sessionTimerRunning) updateSessionTimerDisplay();
 	pmouseIsDown = mouseIsDown;
 	_pxmouse = _xmouse;

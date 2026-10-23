@@ -11,6 +11,9 @@ PLANNED UPCOMING CHANGES (in order of importance + ease of implementation):
 8) Fix input sequences sometimes being recorded slightly inaccurately
 ?) Got any more ideas? DM me on Discord!: @korzenten
 
+10/23/26:
+-Finally added proper README.
+
 09/16/26:
 -Fixed bug where loading a savestate multiple times during a lever/button actuation caused the lever/button's physical state to not reset.
 -Fixed bug where changelog update alert was appearing every time page was opened.
